@@ -189,7 +189,7 @@ const isLegacyAutomationActive = computed(
 );
 
 // Workspace — placeholder single-tenant cho Phase 1
-const workspaceName = computed(() => authStore.user?.fullName?.split(' ')[0] || 'hsholding');
+const workspaceName = computed(() => authStore.user?.fullName?.split(' ')[0] || 'VNPT');
 const workspaceShort = computed(() =>
   workspaceName.value.slice(0, 2).toUpperCase(),
 );

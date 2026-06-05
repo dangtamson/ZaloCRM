@@ -1835,7 +1835,7 @@ model ContactEngagementDaily {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// Tệp khách hàng (Customer Lists) — Phase 7 audience layer
+// Tệp người dùng (Customer Lists) — Phase 7 audience layer
 // ════════════════════════════════════════════════════════════════════════
 // Sale paste/upload danh sách SĐT → CustomerList row + N CustomerListEntry
 // rows. Enrichment async qua background worker + Phase 7 event bus.

@@ -14,7 +14,7 @@ Hệ thống quản lý tập trung nhiều tài khoản Zalo cá nhân trên 1 
 |---|---|
 | ![Zalo Accounts](docs/release-images/v3.3/03-zalo-accounts-redesign.png) | ![Chat media forward](docs/release-images/v3.3/07-chat-media-forward.png) |
 
-| Privacy PIN | RBAC / Tệp khách hàng |
+| Privacy PIN | RBAC / Tệp người dùng |
 |---|---|
 | ![Privacy PIN](docs/release-images/v3.3/04-privacy-pin.png) | ![Customer Lists](docs/release-images/v3.3/06-customer-lists.png) |
 
@@ -225,7 +225,7 @@ docker logs zalo-crm-app --tail 30 | grep -E "broadcast-scheduler|list-enrichmen
 | **Sequences** | Automated message sequences với cron + stop_on_accept gate |
 | **Triggers** | Event-driven: cron, scheduled_cron, webhook (order_success), birthday, request_friend Zalo SDK |
 | **Broadcasts** | CRUD + scheduler + UI, send batch tới audience |
-| **Lists (Tệp khách hàng)** | Import CSV/Excel với column mapping, inline edit, undo delete, 2-axis status (lifecycle + system) |
+| **Lists (Tệp người dùng)** | Import CSV/Excel với column mapping, inline edit, undo delete, 2-axis status (lifecycle + system) |
 | **Engine** | Action handlers, manual_run, block-bound trigger materializer, real Zalo SDK send |
 
 #### 📊 Lead Scoring (Phase 6) — chấm điểm + phát hiện KH đình trệ

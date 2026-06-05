@@ -31,7 +31,7 @@ export interface SequenceRuntimeRules {
 //   - project_zalocrm_cross_nick_friendship_recency: configurable per campaign
 export const DEFAULT_RUNTIME_RULES: SequenceRuntimeRules = {
   allowedHourRange: [6, 22],
-  randomDelayPerSend: { min: 15, max: 45 },
+  randomDelayPerSend: { min: 5, max: 10 },
   perNickThrottle: true,
   crossNickRecencyDays: 30,
   stopOnAccept: true,
@@ -87,7 +87,7 @@ export function validateRuntimeRules(
     }
     const [start, end] = r.allowedHourRange as unknown[];
     if (typeof start !== 'number' || typeof end !== 'number'
-        || start < 0 || start > 23 || end < 0 || end > 23 || start > end) {
+      || start < 0 || start > 23 || end < 0 || end > 23 || start > end) {
       return { ok: false, error: 'allowedHourRange giá trị 0-23, start ≤ end' };
     }
   }

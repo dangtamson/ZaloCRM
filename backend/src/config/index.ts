@@ -88,5 +88,30 @@ export const config = {
   kimiAuthToken: envValue('KIMI_AUTH_TOKEN') || '',
   kimiDefaultMoonshotV1Model: envValue('KIMI_DEFAULT_MOONSHOT_V1_MODEL') || '',
 
+  /* --- AI Image Generation (automation send_message AI image attachment) ---
+   * Provider is chosen per-block (content.aiImagePrompt.provider) and falls
+   * back to AI_IMAGE_DEFAULT_PROVIDER. Each provider reuses its existing
+   * AUTH_TOKEN (OPENAI_AUTH_TOKEN / GEMINI_AUTH_TOKEN) or a dedicated custom
+   * endpoint via AI_IMAGE_CUSTOM_URL + AI_IMAGE_CUSTOM_AUTH_TOKEN.
+   *
+   * Generated images are downloaded to AI_IMAGE_STORAGE_DIR and served via
+   * the /automation-assets static route (registered in app.ts). The public
+   * URL uses APP_URL as the origin. */
+  aiImageDefaultProvider: envValue('AI_IMAGE_DEFAULT_PROVIDER') || 'openai',
+  aiImageOpenaiModel: envValue('AI_IMAGE_OPENAI_MODEL') || 'gpt-image-1',
+  aiImageOpenaiSize: envValue('AI_IMAGE_OPENAI_SIZE') || '1024x1024',
+  aiImageGeminiModel: envValue('AI_IMAGE_GEMINI_MODEL') || 'imagen-3.0-generate-002',
+  aiImageCustomUrl: envValue('AI_IMAGE_CUSTOM_URL') || '',
+  aiImageCustomAuthToken: envValue('AI_IMAGE_CUSTOM_AUTH_TOKEN') || '',
+  /* Default: <workspace>/assets/posts/automation. Backend cwd at runtime is
+   * the `backend/` folder (npm run dev), so we resolve one level up. */
+  aiImageStorageDir: envValue('AI_IMAGE_STORAGE_DIR') || '',
+  aiImagePublicPrefix: envValue('AI_IMAGE_PUBLIC_PREFIX') || '/automation-assets',
+  /* Hard cap on bytes downloaded per generation (defensive against rogue
+   * provider responses). Default 12 MB ≈ generous for 4k PNG. */
+  aiImageMaxBytes: parseInt(envValue('AI_IMAGE_MAX_BYTES') || '12582912'),
+  /* HTTP request timeout per generation call (ms). */
+  aiImageTimeoutMs: parseInt(envValue('AI_IMAGE_TIMEOUT_MS') || '60000'),
+
   isProduction: process.env.NODE_ENV === 'production',
 };

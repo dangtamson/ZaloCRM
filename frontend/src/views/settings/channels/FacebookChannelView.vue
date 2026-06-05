@@ -7,7 +7,7 @@
           <v-icon color="#1877F2" class="mr-1" aria-hidden="true">mdi-facebook</v-icon>
           Kênh Facebook
         </h2>
-        <p class="page-desc">Kết nối Facebook Page để nhận lead tự động vào Tệp khách hàng.</p>
+        <p class="page-desc">Kết nối Facebook Page để nhận lead tự động vào Tệp người dùng.</p>
       </div>
       <v-btn
         color="primary"

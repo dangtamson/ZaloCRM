@@ -47,9 +47,30 @@ export interface MessageAttachment {
   altText?: string;
 }
 
+/**
+ * Optional AI image generation config for `send_message` blocks.
+ *
+ * When present, the engine renders `prompt` with the same template variables
+ * as text variants (e.g. {{contact.fullName}}), calls the configured image
+ * provider, downloads the result into the automation assets directory, and
+ * prepends it as an `image` attachment to the outgoing Zalo message.
+ *
+ * `provider` is optional — falls back to AI_IMAGE_DEFAULT_PROVIDER env.
+ * `failOpen=true` (default) means: if image gen fails, still send the text
+ * message without the image. Set `false` to abort the whole step on failure.
+ */
+export interface AiImagePrompt {
+  prompt: string;
+  provider?: 'openai' | 'gemini' | 'custom';
+  model?: string;
+  size?: string;
+  failOpen?: boolean;
+}
+
 export interface SendMessageContent {
   textVariants: string[];
   attachments?: MessageAttachment[];
+  aiImagePrompt?: AiImagePrompt;
 }
 
 export interface UpdateStatusContent {
@@ -111,6 +132,35 @@ export function validateBlockContent(
           if (typeof a.url !== 'string' || !a.url) {
             return { ok: false, error: 'attachment.url phải là chuỗi không rỗng' };
           }
+        }
+      }
+      // Optional AI image generation config — validates shape but does NOT
+      // contact the provider (validators stay pure for unit testability).
+      const aiCfg = c.aiImagePrompt;
+      if (aiCfg !== undefined && aiCfg !== null) {
+        if (typeof aiCfg !== 'object') {
+          return { ok: false, error: 'aiImagePrompt phải là object' };
+        }
+        const ai = aiCfg as Record<string, unknown>;
+        if (typeof ai.prompt !== 'string' || !ai.prompt.trim()) {
+          return { ok: false, error: 'aiImagePrompt.prompt phải là chuỗi không rỗng' };
+        }
+        if (ai.prompt.length > 4000) {
+          return { ok: false, error: 'aiImagePrompt.prompt tối đa 4000 ký tự' };
+        }
+        if (ai.provider !== undefined && !['openai', 'gemini', 'custom'].includes(ai.provider as string)) {
+          return { ok: false, error: 'aiImagePrompt.provider phải là openai | gemini | custom' };
+        }
+        if (ai.model !== undefined && (typeof ai.model !== 'string' || ai.model.length > 100)) {
+          return { ok: false, error: 'aiImagePrompt.model phải là chuỗi ≤100 ký tự' };
+        }
+        if (ai.size !== undefined) {
+          if (typeof ai.size !== 'string' || !/^\d{2,5}x\d{2,5}$/.test(ai.size)) {
+            return { ok: false, error: 'aiImagePrompt.size phải là dạng "WIDTHxHEIGHT" (vd 1024x1024)' };
+          }
+        }
+        if (ai.failOpen !== undefined && typeof ai.failOpen !== 'boolean') {
+          return { ok: false, error: 'aiImagePrompt.failOpen phải là boolean' };
         }
       }
       return { ok: true };

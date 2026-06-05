@@ -1,5 +1,5 @@
 /**
- * Composable cho Tệp khách hàng (CustomerList).
+ * Composable cho Tệp người dùng (CustomerList).
  *  - List view: fetchLists (filter status: active/archived/all)
  *  - Detail: fetchListById, fetchEntries (tab filter)
  *  - Mutations: create, archive, unarchive, rescan, deleteList, bulkEntries

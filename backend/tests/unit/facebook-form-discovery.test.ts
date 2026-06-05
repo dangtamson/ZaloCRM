@@ -19,7 +19,7 @@ describe('normalizeName', () => {
   });
 
   it('lowercases Vietnamese with diacritics', () => {
-    expect(normalizeName('Tệp Khách Hàng')).toBe('tệp khách hàng');
+    expect(normalizeName('Tệp Khách Hàng')).toBe('tệp người dùng');
   });
 
   it('NFKC normalizes fullwidth characters', () => {

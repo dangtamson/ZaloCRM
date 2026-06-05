@@ -1,5 +1,5 @@
 /**
- * automation/lists/types.ts — Type definitions cho Tệp khách hàng (CustomerList).
+ * automation/lists/types.ts — Type definitions cho Tệp người dùng (CustomerList).
  */
 
 export type ListSourceType = 'paste' | 'csv' | 'excel' | 'api';

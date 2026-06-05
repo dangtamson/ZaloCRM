@@ -146,7 +146,7 @@
             <select v-model="segmentKind" class="at-input">
               <option value="filter">Filter Contact (có Zalo + có status...)</option>
               <option value="manual">Danh sách contactId thủ công</option>
-              <option value="customer-list">Tệp khách hàng (CustomerList)</option>
+              <option value="customer-list">Tệp người dùng (CustomerList)</option>
             </select>
             <textarea
               v-if="segmentKind === 'manual'"

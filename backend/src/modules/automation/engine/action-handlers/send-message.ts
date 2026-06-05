@@ -20,6 +20,10 @@ import { prisma } from '../../../../shared/database/prisma-client.js';
 import { logger } from '../../../../shared/utils/logger.js';
 import { zaloOps } from '../../../../shared/zalo-operations.js';
 import { applyContactAggregateFromMessage, applyFriendAggregate } from '../../../contacts/contact-aggregate.js';
+import { renderMessageTemplate } from '../../template-renderer.js';
+import { generateAndStoreImage } from '../../../ai/image-service.js';
+import { ImageGenError } from '../../../ai/providers/image/types.js';
+import type { AiImagePrompt } from '../../blocks/types.js';
 import type { ActionContext, ActionResult } from '../types.js';
 
 const STUB_MODE = process.env.AUTOMATION_STUB_MODE === 'true';
@@ -28,6 +32,7 @@ export async function sendMessageHandler(ctx: ActionContext): Promise<ActionResu
   const snap = ctx.blockSnapshot as {
     textVariants?: string[];
     attachments?: Array<{ kind: string; url: string; caption?: string; thumbnailUrl?: string; altText?: string }>;
+    aiImagePrompt?: AiImagePrompt;
   };
 
   if (!Array.isArray(snap.textVariants) || snap.textVariants.length === 0) {
@@ -48,7 +53,10 @@ export async function sendMessageHandler(ctx: ActionContext): Promise<ActionResu
   }
 
   const text = snap.textVariants[Math.floor(Math.random() * snap.textVariants.length)];
-  const attachments = Array.isArray(snap.attachments) ? snap.attachments : [];
+  // Clone the static attachment list — we may prepend an AI-generated image
+  // below without mutating the frozen snapshot.
+  const attachments: Array<{ kind: string; url: string; caption?: string; thumbnailUrl?: string; altText?: string }> =
+    Array.isArray(snap.attachments) ? [...snap.attachments] : [];
 
   if (STUB_MODE) {
     logger.info(`[send-message STUB] would send "${text.slice(0, 40)}..." + ${attachments.length} attachment(s) from nick ${ctx.assignedNickId} to contact ${ctx.contactId}`);
@@ -56,6 +64,80 @@ export async function sendMessageHandler(ctx: ActionContext): Promise<ActionResu
       outcome: 'success',
       data: { stub: true, textUsed: text, attachmentCount: attachments.length },
     };
+  }
+
+  // ── AI image generation (optional) ───────────────────────────────────────
+  // If the block has aiImagePrompt, we render template variables against the
+  // contact and produce a fresh image per send. The image is prepended to
+  // attachments so the dispatcher below treats it as the primary attachment.
+  // failOpen (default true) lets the text still go out if image gen fails —
+  // operator can flip to false to abort the step instead.
+  if (snap.aiImagePrompt && snap.aiImagePrompt.prompt) {
+    const aiCfg = snap.aiImagePrompt;
+    const failOpen = aiCfg.failOpen !== false;
+    try {
+      // Load minimal contact + org context for template rendering. Kept
+      // narrow on purpose — these are the only fields template-renderer
+      // exposes by name.
+      const contact = await prisma.contact.findFirst({
+        where: { id: ctx.contactId, orgId: ctx.orgId },
+        select: { id: true, fullName: true, crmName: true, phone: true, status: true, tags: true },
+      });
+      const org = await prisma.organization.findUnique({
+        where: { id: ctx.orgId },
+        select: { id: true, name: true },
+      });
+      const renderedPrompt = renderMessageTemplate(aiCfg.prompt, {
+        contact: contact
+          ? {
+              id: contact.id,
+              fullName: contact.fullName,
+              crmName: contact.crmName,
+              phone: contact.phone,
+              status: contact.status,
+              tags: contact.tags,
+            }
+          : null,
+        org: org ?? null,
+        conversation: null,
+      }).trim();
+
+      if (!renderedPrompt) {
+        throw new ImageGenError('UNKNOWN', 'Rendered AI image prompt is empty');
+      }
+
+      const generated = await generateAndStoreImage({
+        orgId: ctx.orgId,
+        prompt: renderedPrompt,
+        provider: aiCfg.provider,
+        model: aiCfg.model,
+        size: aiCfg.size,
+      });
+      // Prepend so dispatch picks our generated image first.
+      attachments.unshift({
+        kind: 'image',
+        url: generated.url,
+        caption: text,
+      });
+      logger.info(
+        `[send-message] AI image prepended for contact=${ctx.contactId} provider=${generated.providerId} bytes=${generated.byteLength}`,
+      );
+    } catch (err) {
+      const code = err instanceof ImageGenError ? err.code : 'UNKNOWN';
+      const msg = err instanceof Error ? err.message : String(err);
+      const retryable = err instanceof ImageGenError ? err.retryable : false;
+      if (!failOpen) {
+        return {
+          outcome: 'failure',
+          errorCode: `AI_IMAGE_${code}`,
+          errorMessage: `AI image gen failed: ${msg}`,
+          retryable,
+        };
+      }
+      logger.warn(
+        `[send-message] AI image gen failed (failOpen=true, sending text only): ${code} ${msg}`,
+      );
+    }
   }
 
   // ── Real impl ───────────────────────────────────────────────────────────

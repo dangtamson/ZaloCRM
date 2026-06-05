@@ -39,6 +39,20 @@ export const ACTION_TYPE_ICONS: Record<BlockActionType, string> = {
   update_lead_score: 'mdi-trophy',
 };
 
+/**
+ * Optional AI image generation config for `send_message` blocks (mirrors
+ * backend AiImagePrompt). When set, engine renders `prompt` with template
+ * variables, calls the configured provider, and prepends the generated image
+ * as the primary attachment of the outgoing Zalo message.
+ */
+export interface AiImagePrompt {
+  prompt: string;
+  provider?: 'openai' | 'gemini' | 'custom';
+  model?: string;
+  size?: string;
+  failOpen?: boolean;
+}
+
 export interface BlockFolder {
   id: string;
   orgId: string;

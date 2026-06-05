@@ -342,7 +342,7 @@ const RESOURCE_LABELS: Record<string, { icon: string; label: string }> = {
   conversation: { icon: '💬', label: 'Hội thoại' },
   contact: { icon: '👥', label: 'Khách hàng' },
   friend: { icon: '🫂', label: 'Friends Zalo' },
-  customer_list: { icon: '📋', label: 'Tệp khách hàng' },
+  customer_list: { icon: '📋', label: 'Tệp người dùng' },
   broadcast: { icon: '📢', label: 'Chiến dịch' },
   sequence: { icon: '🔁', label: 'Sequence' },
   trigger: { icon: '⚡', label: 'Trigger' },

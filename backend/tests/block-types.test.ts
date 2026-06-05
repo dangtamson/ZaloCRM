@@ -101,6 +101,84 @@ describe('validateBlockContent — send_message', () => {
     });
     expect(r.ok).toBe(false);
   });
+
+  // ── aiImagePrompt (optional AI image generation) ─────────────────────────
+  describe('aiImagePrompt', () => {
+    it('accepts when omitted (backward compat with existing blocks)', () => {
+      const r = validateBlockContent('send_message', { textVariants: ['hi'] });
+      expect(r.ok).toBe(true);
+    });
+
+    it('accepts a minimal prompt-only config', () => {
+      const r = validateBlockContent('send_message', {
+        textVariants: ['hi'],
+        aiImagePrompt: { prompt: 'A cute cat in Vietnamese style' },
+      });
+      expect(r.ok).toBe(true);
+    });
+
+    it('accepts full config with provider/model/size/failOpen', () => {
+      const r = validateBlockContent('send_message', {
+        textVariants: ['hi'],
+        aiImagePrompt: {
+          prompt: 'Portrait of {{contact.fullName}}',
+          provider: 'openai',
+          model: 'gpt-image-1',
+          size: '1024x1024',
+          failOpen: false,
+        },
+      });
+      expect(r.ok).toBe(true);
+    });
+
+    it('rejects empty prompt string', () => {
+      const r = validateBlockContent('send_message', {
+        textVariants: ['hi'],
+        aiImagePrompt: { prompt: '   ' },
+      });
+      expect(r.ok).toBe(false);
+    });
+
+    it('rejects non-string prompt', () => {
+      const r = validateBlockContent('send_message', {
+        textVariants: ['hi'],
+        aiImagePrompt: { prompt: 123 },
+      });
+      expect(r.ok).toBe(false);
+    });
+
+    it('rejects unknown provider', () => {
+      const r = validateBlockContent('send_message', {
+        textVariants: ['hi'],
+        aiImagePrompt: { prompt: 'cat', provider: 'midjourney' },
+      });
+      expect(r.ok).toBe(false);
+    });
+
+    it('rejects malformed size', () => {
+      const r = validateBlockContent('send_message', {
+        textVariants: ['hi'],
+        aiImagePrompt: { prompt: 'cat', size: 'big' },
+      });
+      expect(r.ok).toBe(false);
+    });
+
+    it('rejects non-boolean failOpen', () => {
+      const r = validateBlockContent('send_message', {
+        textVariants: ['hi'],
+        aiImagePrompt: { prompt: 'cat', failOpen: 'yes' },
+      });
+      expect(r.ok).toBe(false);
+    });
+
+    it('rejects prompt longer than 4000 chars', () => {
+      const r = validateBlockContent('send_message', {
+        textVariants: ['hi'],
+        aiImagePrompt: { prompt: 'x'.repeat(4001) },
+      });
+      expect(r.ok).toBe(false);
+    });
+  });
 });
 
 describe('validateBlockContent — update_status', () => {

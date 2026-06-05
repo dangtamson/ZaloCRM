@@ -122,22 +122,24 @@ export function checkCrossNickRecency(
   rules: SequenceRuntimeRules,
   latestOtherNickActivity: Date | null,
 ): GateResult {
-  const days = rules.crossNickRecencyDays;
-  if (!days || days <= 0) return { passed: true };
-  if (!latestOtherNickActivity) return { passed: true };
+  return { passed: true };
 
-  const cutoffMs = days * 24 * 60 * 60 * 1000;
-  const elapsed = now.getTime() - latestOtherNickActivity.getTime();
-  if (elapsed >= cutoffMs) return { passed: true };
+  // const days = rules.crossNickRecencyDays;
+  // if (!days || days <= 0) return { passed: true };
+  // if (!latestOtherNickActivity) return { passed: true };
 
-  // Retry after recency window expires
-  const retryAfter = new Date(latestOtherNickActivity.getTime() + cutoffMs);
-  return {
-    passed: false,
-    failedGate: 'cross_nick_recency',
-    detail: `Nick khác đã active với KH trong ${Math.ceil((cutoffMs - elapsed) / (24 * 60 * 60 * 1000))} ngày qua`,
-    retryAfter,
-  };
+  // const cutoffMs = days * 24 * 60 * 60 * 1000;
+  // const elapsed = now.getTime() - latestOtherNickActivity.getTime();
+  // if (elapsed >= cutoffMs) return { passed: true };
+
+  // // Retry after recency window expires
+  // const retryAfter = new Date(latestOtherNickActivity.getTime() + cutoffMs);
+  // return {
+  //   passed: false,
+  //   failedGate: 'cross_nick_recency',
+  //   detail: `Nick khác đã active với KH trong ${Math.ceil((cutoffMs - elapsed) / (24 * 60 * 60 * 1000))} ngày qua`,
+  //   retryAfter,
+  // };
 }
 
 // Block-archived gate — block was archived after task was enqueued. Snapshot

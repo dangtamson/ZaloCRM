@@ -3,7 +3,7 @@
     <!-- Breadcrumb -->
     <div class="breadcrumb">
       <a @click="$router.push('/automation/bot/lists')">
-        <v-icon size="14">mdi-folder-account-outline</v-icon> Tệp khách hàng
+        <v-icon size="14">mdi-folder-account-outline</v-icon> Tệp người dùng
       </a>
       <span class="sep">›</span>
       <span>{{ currentList?.name ?? '...' }}</span>

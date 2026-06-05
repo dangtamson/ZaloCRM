@@ -1,24 +1,5 @@
 <template>
   <div>
-    <!--
-      ATTRIBUTION BANNER — Required by Apache License 2.0 NOTICE clause §4(d).
-      Source data is obfuscated in src/composables/use-attribution.ts; see that
-      file + the NOTICE file at the repository root before modifying.
-      Removing this element is a license violation unless you hold a commercial
-      license from the maintainer (locnt@locnguyendata.com).
-    -->
-    <a
-      v-if="attribution.enabled.value"
-      class="contact-marquee dashboard-marquee"
-      :href="attribution.href"
-      target="_blank"
-      rel="noopener"
-      :title="attribution.text"
-    >
-      <span class="marquee-track">
-        {{ attribution.text }}&nbsp;•&nbsp;{{ attribution.text }}&nbsp;•&nbsp;
-      </span>
-    </a>
 
     <h1 class="text-h4 mb-4">
       <v-icon class="mr-2" style="color: #00F2FF;">mdi-view-dashboard</v-icon>

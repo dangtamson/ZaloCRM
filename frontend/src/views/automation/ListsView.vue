@@ -2,7 +2,7 @@
   <div class="lists-view">
     <header class="at-page-header">
       <div>
-        <h1 class="at-page-title">📂 Tệp khách hàng</h1>
+        <h1 class="at-page-title">📂 Tệp người dùng</h1>
         <p class="at-page-subtitle">
           Paste hoặc upload danh sách SĐT → tạo Tệp KH với counter có/không Zalo, dedup tự động.
           Tệp KH làm <b>audience source</b> cho Sequence / Broadcast / Campaign sau này.
@@ -57,7 +57,7 @@
     <div v-if="!loadingLists && lists.length === 0" class="empty-state">
       <div class="empty-icon">📂</div>
       <h3 v-if="listsStatus === 'archived'">Chưa có tệp nào lưu trữ</h3>
-      <h3 v-else>Chưa có tệp khách hàng nào</h3>
+      <h3 v-else>Chưa có tệp người dùng nào</h3>
       <p v-if="listsStatus === 'active'">
         Bấm "Tạo tệp mới" để paste/upload danh sách SĐT đầu tiên.
       </p>

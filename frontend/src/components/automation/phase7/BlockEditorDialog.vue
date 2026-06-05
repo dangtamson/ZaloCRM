@@ -88,6 +88,73 @@
             <v-btn icon variant="text" size="small" @click="attachments.splice(idx, 1)"><v-icon size="small">mdi-close</v-icon></v-btn>
           </div>
           <v-btn variant="text" size="small" prepend-icon="mdi-plus" @click="attachments.push({ kind: 'image', url: '', caption: '' })">Thêm đính kèm</v-btn>
+
+          <!-- AI image generation: per-send, prepended to outgoing attachments -->
+          <v-divider class="my-4" />
+          <div class="d-flex align-center mb-2">
+            <v-icon class="mr-2" color="purple">mdi-image-auto-adjust</v-icon>
+            <span class="text-subtitle-2">AI tạo ảnh tự động</span>
+            <v-spacer />
+            <v-switch
+              v-model="aiImageEnabled"
+              color="purple"
+              density="compact"
+              hide-details
+              inset
+            />
+          </div>
+          <div class="text-caption text-medium-emphasis mb-2">
+            Khi bật, engine sẽ gọi AI gen 1 ảnh mới cho mỗi KH dựa trên prompt bên dưới rồi gửi kèm tin nhắn. Ảnh AI luôn đứng trước các đính kèm tĩnh ở trên.
+          </div>
+          <template v-if="aiImageEnabled">
+            <v-textarea
+              v-model="aiImagePrompt.prompt"
+              label="Prompt sinh ảnh"
+              variant="outlined"
+              rows="3"
+              auto-grow
+              counter="4000"
+              :rules="[(v: string) => !!v?.trim() || 'Prompt không được rỗng', (v: string) => (v?.length ?? 0) <= 4000 || 'Tối đa 4000 ký tự']"
+              hint="Có thể dùng biến template: {{contact.fullName}}, {{contact.crmName}}, {{org.name}}, {{date.today}}…"
+              persistent-hint
+              class="mb-3"
+            />
+            <div class="d-flex gap-2">
+              <v-select
+                v-model="aiImagePrompt.provider"
+                :items="aiProviderItems"
+                item-title="label"
+                item-value="value"
+                label="Provider"
+                variant="outlined"
+                density="compact"
+                style="max-width: 180px"
+              />
+              <v-text-field
+                v-model="aiImagePrompt.model"
+                label="Model (optional)"
+                variant="outlined"
+                density="compact"
+                placeholder="theo ENV nếu trống"
+              />
+              <v-text-field
+                v-model="aiImagePrompt.size"
+                label="Kích thước"
+                variant="outlined"
+                density="compact"
+                placeholder="1024x1024"
+                style="max-width: 140px"
+                :rules="[(v: string) => !v || /^\d{2,5}x\d{2,5}$/.test(v) || 'Dạng WxH, vd 1024x1024']"
+              />
+            </div>
+            <v-checkbox
+              v-model="aiImagePrompt.failOpen"
+              label="Vẫn gửi text nếu gen ảnh lỗi (failOpen)"
+              density="compact"
+              hide-details
+              class="mt-1"
+            />
+          </template>
         </template>
 
         <!-- update_status -->
@@ -132,7 +199,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { ACTION_TYPE_LABELS, ACTION_TYPE_ICONS, SUPPORTED_ACTION_TYPES, type Block, type BlockActionType, type BlockFolder } from '@/api/automation/types';
+import { ACTION_TYPE_LABELS, ACTION_TYPE_ICONS, SUPPORTED_ACTION_TYPES, type Block, type BlockActionType, type BlockFolder, type AiImagePrompt } from '@/api/automation/types';
 import { blocksApi } from '@/api/automation';
 
 const props = defineProps<{
@@ -157,6 +224,21 @@ const draft = ref<Draft>({ name: '', actionType: 'send_message', folderId: null 
 const greetingVariants = ref<string[]>(['']);
 const textVariants = ref<string[]>(['']);
 const attachments = ref<Array<{ kind: string; url: string; caption: string }>>([]);
+// AI image generation (send_message only) — fully optional. The toggle below
+// drives whether `aiImagePrompt` is serialized into block.content on save.
+const aiImageEnabled = ref(false);
+const aiImagePrompt = ref<Required<Pick<AiImagePrompt, 'prompt'>> & {
+  provider: AiImagePrompt['provider'] | '';
+  model: string;
+  size: string;
+  failOpen: boolean;
+}>({ prompt: '', provider: '', model: '', size: '1024x1024', failOpen: true });
+const aiProviderItems = [
+  { value: '', label: 'Mặc định (theo ENV)' },
+  { value: 'openai', label: 'OpenAI Images' },
+  { value: 'gemini', label: 'Gemini Imagen' },
+  { value: 'custom', label: 'Custom endpoint' },
+];
 const statusId = ref<string>('');
 const onlyFromStatusIds = ref<string[]>([]);
 const saving = ref(false);
@@ -180,6 +262,20 @@ watch(() => props.modelValue, (open) => {
     attachments.value = Array.isArray(c.attachments)
       ? (c.attachments as Array<{ kind: string; url: string; caption?: string }>).map((a) => ({ kind: a.kind, url: a.url, caption: a.caption ?? '' }))
       : [];
+    const aiCfg = c.aiImagePrompt as AiImagePrompt | undefined;
+    if (aiCfg && typeof aiCfg === 'object' && aiCfg.prompt) {
+      aiImageEnabled.value = true;
+      aiImagePrompt.value = {
+        prompt: aiCfg.prompt,
+        provider: aiCfg.provider ?? '',
+        model: aiCfg.model ?? '',
+        size: aiCfg.size ?? '1024x1024',
+        failOpen: aiCfg.failOpen !== false,
+      };
+    } else {
+      aiImageEnabled.value = false;
+      aiImagePrompt.value = { prompt: '', provider: '', model: '', size: '1024x1024', failOpen: true };
+    }
     statusId.value = typeof c.statusId === 'string' ? c.statusId : '';
     onlyFromStatusIds.value = Array.isArray(c.onlyFromStatusIds) ? [...c.onlyFromStatusIds as string[]] : [];
   } else {
@@ -187,6 +283,8 @@ watch(() => props.modelValue, (open) => {
     greetingVariants.value = [''];
     textVariants.value = [''];
     attachments.value = [];
+    aiImageEnabled.value = false;
+    aiImagePrompt.value = { prompt: '', provider: '', model: '', size: '1024x1024', failOpen: true };
     statusId.value = '';
     onlyFromStatusIds.value = [];
   }
@@ -213,6 +311,18 @@ function buildContent(): Record<string, unknown> {
           url: a.url,
           ...(a.caption ? { caption: a.caption } : {}),
         }));
+      }
+      // Only persist aiImagePrompt when the operator explicitly enabled it AND
+      // provided a non-empty prompt. Backend validator rejects empty prompts.
+      if (aiImageEnabled.value && aiImagePrompt.value.prompt.trim()) {
+        const ai: Record<string, unknown> = {
+          prompt: aiImagePrompt.value.prompt.trim(),
+          failOpen: aiImagePrompt.value.failOpen,
+        };
+        if (aiImagePrompt.value.provider) ai.provider = aiImagePrompt.value.provider;
+        if (aiImagePrompt.value.model.trim()) ai.model = aiImagePrompt.value.model.trim();
+        if (aiImagePrompt.value.size.trim()) ai.size = aiImagePrompt.value.size.trim();
+        out.aiImagePrompt = ai;
       }
       return out;
     }

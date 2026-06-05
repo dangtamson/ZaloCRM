@@ -2,7 +2,7 @@
   <div v-if="modelValue" class="modal-overlay" @click.self="$emit('update:modelValue', false)">
     <div class="modal">
       <div class="modal-head">
-        <h3>📥 Tạo tệp khách hàng mới</h3>
+        <h3>📥 Tạo tệp người dùng mới</h3>
         <button class="x" @click="$emit('update:modelValue', false)">✕</button>
       </div>
       <div class="modal-body">

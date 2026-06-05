@@ -63,7 +63,7 @@ import { sequenceRoutes } from './modules/automation/sequences/sequence-routes.j
 import { triggerRoutes } from './modules/automation/triggers/trigger-routes.js';
 import { broadcastRoutes } from './modules/automation/broadcasts/broadcast-routes.js';
 import { webhookRoutes as automationWebhookRoutes } from './modules/automation/webhooks/webhook-routes.js';
-// Tệp khách hàng (CustomerList) — Phase 7 audience layer
+// Tệp người dùng (CustomerList) — Phase 7 audience layer
 import { customerListRoutes } from './modules/automation/lists/list-routes.js';
 import { customerListEntryRoutes } from './modules/automation/lists/list-entry-routes.js';
 import { startListEnrichmentWorker } from './modules/automation/lists/list-enrichment-service.js';
@@ -129,6 +129,29 @@ async function bootstrap() {
       root: path.join(__dirname, '../static'),
       prefix: '/',
     });
+  }
+
+  // Serve AI-generated automation assets (send_message blocks with aiImagePrompt).
+  // Image bytes are written by modules/ai/image-service.ts into the configured
+  // storage dir; this static route exposes them so the Zalo SDK can fetch the
+  // URL when sending. Registered in BOTH dev + prod (Zalo SDK needs a real
+  // public URL even in development tunnel setups).
+  {
+    const { getStorageRoot } = await import('./modules/ai/image-service.js');
+    const { mkdirSync } = await import('node:fs');
+    const root = getStorageRoot();
+    // fastifyStatic refuses to start if the root doesn't exist.
+    mkdirSync(root, { recursive: true });
+    await app.register(fastifyStatic, {
+      root,
+      prefix: config.aiImagePublicPrefix.endsWith('/')
+        ? config.aiImagePublicPrefix
+        : `${config.aiImagePublicPrefix}/`,
+      decorateReply: false, // avoid clashing with the optional prod static plugin above
+      // Long cache: URLs are uuid-namespaced and never reused.
+      maxAge: '7d',
+    });
+    logger.info(`[ai-image] static prefix=${config.aiImagePublicPrefix} root=${root}`);
   }
 
   // ── Socket.IO ─────────────────────────────────────────────────────────────
@@ -204,7 +227,7 @@ async function bootstrap() {
   await app.register(triggerRoutes);
   await app.register(broadcastRoutes);
   await app.register(automationWebhookRoutes);
-  // Tệp khách hàng — CustomerList CRUD + entries + enrichment + event handlers
+  // Tệp người dùng — CustomerList CRUD + entries + enrichment + event handlers
   await app.register(customerListRoutes);
   await app.register(customerListEntryRoutes);
   await app.register(chatOperationsRoutes);
@@ -287,7 +310,7 @@ async function bootstrap() {
       // Phase F — Broadcast scheduler: poll automation_broadcasts scheduled→running
       const { startBroadcastScheduler } = await import('./modules/automation/broadcasts/broadcast-scheduler.js');
       startBroadcastScheduler();
-      // Tệp khách hàng — enrichment worker + reverse-update event handlers
+      // Tệp người dùng — enrichment worker + reverse-update event handlers
       startListEnrichmentWorker();
       registerCustomerListEventHandlers();
       // FB Lead Ingestion — BullMQ worker (Phase 04)

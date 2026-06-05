@@ -328,7 +328,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   conversation: 'Hội thoại',
   contact: 'Khách hàng',
   friend: 'Friends Zalo',
-  customer_list: 'Tệp khách hàng',
+  customer_list: 'Tệp người dùng',
   broadcast: 'Chiến dịch',
   sequence: 'Sequence',
   trigger: 'Trigger',
