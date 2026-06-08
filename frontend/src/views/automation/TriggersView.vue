@@ -226,6 +226,61 @@
             </select>
           </div>
 
+          <div v-if="showSendMessageTargetsConfig" class="form-field trigger-targets">
+            <label class="form-label">Người nhận tin nhắn</label>
+            <p class="at-caption form-hint">
+              Cấu hình ở trigger để cùng một block nội dung có thể gửi đến group/contact khác nhau theo từng kịch bản.
+            </p>
+
+            <label class="form-toggle">
+              <input type="checkbox" v-model="triggerGroupTargetsEnabled" />
+              <span>Gửi vào group</span>
+            </label>
+            <template v-if="triggerGroupTargetsEnabled">
+              <div v-for="(target, idx) in triggerGroupTargets" :key="`trigger-group-${idx}`" class="trigger-target-row">
+                <select v-model="target.accountId" class="at-input" @change="onTriggerGroupAccountChanged(idx)">
+                  <option value="">— Nick gửi —</option>
+                  <option v-for="account in triggerAccountItems" :key="account.value" :value="account.value">{{ account.title }}</option>
+                </select>
+                <select v-model="target.groupId" class="at-input" @change="onTriggerGroupSelected(idx)">
+                  <option value="">— Group nhận —</option>
+                  <option v-for="group in triggerGroupItemsForAccount(target.accountId)" :key="`${group.accountId}:${group.value}`" :value="group.value">{{ group.title }}</option>
+                </select>
+                <button type="button" class="at-btn at-btn--ghost at-btn--xs trigger-target-row__remove" @click="removeTriggerGroupTarget(idx)">
+                  <v-icon size="16">mdi-close</v-icon>
+                </button>
+              </div>
+              <button type="button" class="at-btn at-btn--ghost at-btn--sm" @click="addTriggerGroupTarget">
+                <v-icon size="15">mdi-plus</v-icon>
+                Thêm group
+              </button>
+            </template>
+
+            <label class="form-toggle trigger-targets__toggle">
+              <input type="checkbox" v-model="triggerUserTargetsEnabled" />
+              <span>Gửi cho cá nhân</span>
+            </label>
+            <template v-if="triggerUserTargetsEnabled">
+              <div v-for="(target, idx) in triggerUserTargets" :key="`trigger-user-${idx}`" class="trigger-target-row">
+                <select v-model="target.accountId" class="at-input">
+                  <option value="">— Nick gửi —</option>
+                  <option v-for="account in triggerAccountItems" :key="account.value" :value="account.value">{{ account.title }}</option>
+                </select>
+                <select v-model="target.contactId" class="at-input">
+                  <option value="">— Contact nhận —</option>
+                  <option v-for="contact in triggerUserContactItems" :key="contact.value" :value="contact.value">{{ contact.title }}</option>
+                </select>
+                <button type="button" class="at-btn at-btn--ghost at-btn--xs trigger-target-row__remove" @click="removeTriggerUserTarget(idx)">
+                  <v-icon size="16">mdi-close</v-icon>
+                </button>
+              </div>
+              <button type="button" class="at-btn at-btn--ghost at-btn--sm" @click="addTriggerUserTarget">
+                <v-icon size="15">mdi-plus</v-icon>
+                Thêm contact
+              </button>
+            </template>
+          </div>
+
           <!-- Cron expression field — only for scheduled_cron event type -->
           <div v-if="draft.eventType === 'scheduled_cron'" class="form-field">
             <label class="form-label">Cron expression (TZ Asia/Ho_Chi_Minh)</label>
@@ -242,6 +297,30 @@
               <button type="button" class="filter-chip" @click="draft.cronExpr = '0 9 * * *'">Daily 9h</button>
               <button type="button" class="filter-chip" @click="draft.cronExpr = '0 18 * * 5'">T6 18h</button>
             </div>
+          </div>
+
+          <div v-if="draft.eventType === 'scheduled_cron'" class="form-field">
+            <label class="form-label">Audience theo tệp người dùng (optional)</label>
+            <select v-model="segmentKind" class="at-input">
+              <option value="none">Không dùng customer-list</option>
+              <option value="customer-list">Dùng customer-list</option>
+            </select>
+            <template v-if="segmentKind === 'customer-list'">
+              <select v-model="segmentCustomerListId" class="at-input">
+                <option value="">— Chọn tệp người dùng —</option>
+                <option v-for="list in customerListOptions" :key="list.id" :value="list.id">
+                  {{ list.iconEmoji ? `${list.iconEmoji} ` : '' }}{{ list.name }}
+                  ({{ list.validEntries }}/{{ list.totalEntries }} hợp lệ)
+                </option>
+              </select>
+              <p v-if="customerListOptions.length === 0" class="at-caption form-hint">
+                Chưa có tệp người dùng active. Tạo tệp ở mục Tệp người dùng trước.
+              </p>
+              <label class="form-toggle">
+                <input type="checkbox" v-model="segmentBirthdayThisWeek" />
+                <span>Chỉ lấy người có sinh nhật trong tuần hiện tại</span>
+              </label>
+            </template>
           </div>
 
           <label class="form-toggle">
@@ -269,18 +348,48 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
+import { api } from '@/api/index';
 import { triggersApi, sequencesApi, blocksApi } from '@/api/automation';
 import type {
   AutomationTrigger, TriggerCatalogEntry, AutomationSequence, Block,
   TriggerEventType, TriggerBindingKind, TriggerCategory,
 } from '@/api/automation/types';
 import { CATEGORY_COLOR, iconForEvent } from '@/components/automation/phase7/design-tokens';
+import { useZaloAccounts } from '@/composables/use-zalo-accounts';
+import { useContacts, type Contact } from '@/composables/use-contacts';
 
 const tab = ref<'configured' | 'catalog'>('configured');
 const catalog = ref<TriggerCatalogEntry[]>([]);
 const configured = ref<AutomationTrigger[]>([]);
 const sequences = ref<AutomationSequence[]>([]);
 const blocks = ref<Block[]>([]);
+const customerListOptions = ref<Array<{
+  id: string;
+  name: string;
+  iconEmoji: string | null;
+  totalEntries: number;
+  validEntries: number;
+}>>([]);
+const {
+  accounts: zaloAccounts,
+  fetchAccounts,
+} = useZaloAccounts();
+const {
+  contacts: groupContacts,
+  filters: groupContactFilters,
+  pagination: groupContactPagination,
+  fetchContacts: fetchGroupContacts,
+} = useContacts();
+const {
+  contacts: userContacts,
+  filters: userContactFilters,
+  pagination: userContactPagination,
+  fetchContacts: fetchUserContacts,
+} = useContacts();
+groupContactFilters.threadType = 'group';
+groupContactPagination.limit = 100;
+userContactFilters.threadType = 'user';
+userContactPagination.limit = 100;
 const loading = ref(true);
 
 const catalogSearch = ref('');
@@ -307,6 +416,14 @@ interface Draft {
   cronExpr: string; // packed into eventFilter.cron when eventType=scheduled_cron
 }
 const draft = ref<Draft | null>(null);
+const segmentKind = ref<'none' | 'customer-list'>('none');
+const segmentCustomerListId = ref('');
+const segmentBirthdayThisWeek = ref(false);
+const triggerGroupTargetsEnabled = ref(false);
+const triggerUserTargetsEnabled = ref(false);
+const triggerGroupTargets = ref<Array<{ accountId: string; groupId: string }>>([{ accountId: '', groupId: '' }]);
+const triggerUserTargets = ref<Array<{ accountId: string; contactId: string }>>([{ accountId: '', contactId: '' }]);
+const triggerRuleOverridesBase = ref<Record<string, unknown>>({});
 
 const availableCategories = computed(() => {
   const present = new Set(catalog.value.map((c) => c.category));
@@ -341,6 +458,38 @@ const sequenceOptions = computed(() =>
 const blockOptions = computed(() =>
   blocks.value.filter((b) => !b.archivedAt).map((b) => ({ value: b.id, title: b.name })),
 );
+const draftBlock = computed(() => {
+  if (!draft.value?.blockId) return null;
+  return blocks.value.find((b) => b.id === draft.value?.blockId) ?? null;
+});
+const showSendMessageTargetsConfig = computed(() => (
+  draft.value?.bindingKind === 'block'
+  && draftBlock.value?.actionType === 'send_message'
+));
+const triggerAccountItems = computed(() => {
+  const items = zaloAccounts.value.map((account) => ({
+    title: account.displayName || account.phone || account.zaloUid || account.id,
+    value: account.id,
+  }));
+  const selectedIds = [
+    ...triggerGroupTargets.value.map((target) => target.accountId),
+    ...triggerUserTargets.value.map((target) => target.accountId),
+  ].filter(Boolean);
+  for (const id of selectedIds) {
+    if (!items.some((item) => item.value === id)) items.push({ title: id, value: id });
+  }
+  return items;
+});
+const triggerUserContactItems = computed(() => {
+  const items = userContacts.value.map((contact) => ({
+    title: contact.fullName || contact.crmName || contact.phone || contact.id,
+    value: contact.id,
+  }));
+  for (const id of triggerUserTargets.value.map((target) => target.contactId).filter(Boolean)) {
+    if (!items.some((item) => item.value === id)) items.push({ title: id, value: id });
+  }
+  return items;
+});
 
 function bindingLabel(b: TriggerBindingKind): string {
   return { sequence: 'Sequence', block: 'Block', broadcast: 'Broadcast' }[b];
@@ -349,16 +498,21 @@ function bindingLabel(b: TriggerBindingKind): string {
 async function loadAll() {
   loading.value = true;
   try {
-    const [cat, conf, seqs, blks] = await Promise.all([
+    const [cat, conf, seqs, blks, listsRes] = await Promise.all([
       triggersApi.listTriggerCatalog(),
       triggersApi.listTriggers(),
       sequencesApi.listSequences(),
       blocksApi.listBlocks({ limit: 500 }),
+      api.get('/customer-lists', { params: { status: 'active', limit: 100 } }),
+      fetchAccounts(),
+      fetchGroupContacts(),
+      fetchUserContacts(),
     ]);
     catalog.value = cat;
     configured.value = conf;
     sequences.value = seqs;
     blocks.value = blks;
+    customerListOptions.value = listsRes.data?.lists ?? [];
   } finally {
     loading.value = false;
   }
@@ -380,6 +534,11 @@ function openCreateFromCatalog(entry: TriggerCatalogEntry) {
     cronExpr: entry.eventType === 'scheduled_cron' ? '0 9 * * 1' : '',
   };
   error.value = '';
+  segmentKind.value = 'none';
+  segmentCustomerListId.value = '';
+  segmentBirthdayThisWeek.value = false;
+  triggerRuleOverridesBase.value = {};
+  resetTriggerTargets();
   editorOpen.value = true;
 }
 
@@ -396,6 +555,17 @@ function openEdit(trig: AutomationTrigger) {
     enabled: trig.enabled,
     cronExpr: extractCronFromFilter(trig.eventFilter),
   };
+  const seg = trig.segmentSpec as Record<string, unknown> | null;
+  if (seg?.kind === 'customer-list' && typeof seg.listId === 'string') {
+    segmentKind.value = 'customer-list';
+    segmentCustomerListId.value = seg.listId;
+    segmentBirthdayThisWeek.value = seg.birthdayThisWeek === true;
+  } else {
+    segmentKind.value = 'none';
+    segmentCustomerListId.value = '';
+    segmentBirthdayThisWeek.value = false;
+  }
+  readTriggerTargetsFromRuleOverrides(trig.ruleOverrides);
   error.value = '';
   editorOpen.value = true;
 }
@@ -404,6 +574,134 @@ function extractCronFromFilter(filter: Record<string, unknown> | null): string {
   if (!filter || typeof filter !== 'object') return '';
   const c = (filter as Record<string, unknown>).cron;
   return typeof c === 'string' ? c : '';
+}
+
+function groupOptionsFromContact(contact: Contact, accountNames: Map<string, string>) {
+  return (contact.conversations ?? [])
+    .filter((conversation) => conversation.threadType === 'group' && conversation.externalThreadId)
+    .map((conversation) => {
+      const accountName = accountNames.get(conversation.zaloAccountId) || conversation.zaloAccountId;
+      const groupName = conversation.groupName || contact.fullName || contact.crmName || conversation.externalThreadId || contact.id;
+      return {
+        title: `${groupName} · ${accountName}`,
+        value: conversation.externalThreadId!,
+        accountId: conversation.zaloAccountId,
+      };
+    });
+}
+
+function triggerGroupItemsForAccount(accountId: string) {
+  const accountNames = new Map(zaloAccounts.value.map((account) => [
+    account.id,
+    account.displayName || account.phone || account.zaloUid || account.id,
+  ]));
+  const items = groupContacts.value.flatMap((contact) => groupOptionsFromContact(contact, accountNames));
+  return accountId ? items.filter((item) => item.accountId === accountId) : items;
+}
+
+function onTriggerGroupAccountChanged(idx: number) {
+  const target = triggerGroupTargets.value[idx];
+  if (!target?.accountId || !target.groupId) return;
+  const valid = triggerGroupItemsForAccount(target.accountId).some((item) => item.value === target.groupId);
+  if (!valid) target.groupId = '';
+}
+
+function onTriggerGroupSelected(idx: number) {
+  const target = triggerGroupTargets.value[idx];
+  if (!target || target.accountId || !target.groupId) return;
+  const selected = triggerGroupItemsForAccount('').find((item) => item.value === target.groupId);
+  if (selected?.accountId) target.accountId = selected.accountId;
+}
+
+function addTriggerGroupTarget() {
+  triggerGroupTargets.value.push({ accountId: '', groupId: '' });
+}
+
+function removeTriggerGroupTarget(idx: number) {
+  if (triggerGroupTargets.value.length <= 1) {
+    triggerGroupTargets.value = [{ accountId: '', groupId: '' }];
+    return;
+  }
+  triggerGroupTargets.value.splice(idx, 1);
+}
+
+function addTriggerUserTarget() {
+  triggerUserTargets.value.push({ accountId: '', contactId: '' });
+}
+
+function removeTriggerUserTarget(idx: number) {
+  if (triggerUserTargets.value.length <= 1) {
+    triggerUserTargets.value = [{ accountId: '', contactId: '' }];
+    return;
+  }
+  triggerUserTargets.value.splice(idx, 1);
+}
+
+function resetTriggerTargets() {
+  triggerGroupTargetsEnabled.value = false;
+  triggerUserTargetsEnabled.value = false;
+  triggerGroupTargets.value = [{ accountId: '', groupId: '' }];
+  triggerUserTargets.value = [{ accountId: '', contactId: '' }];
+}
+
+function readTriggerTargetsFromRuleOverrides(ruleOverrides: Record<string, unknown> | null) {
+  const base = ruleOverrides && typeof ruleOverrides === 'object' ? { ...ruleOverrides } : {};
+  const targets = base.sendMessageTargets;
+  delete base.sendMessageTargets;
+  triggerRuleOverridesBase.value = base;
+  const groupTargets = readGroupTargets(targets);
+  const userTargets = readUserTargets(targets);
+  triggerGroupTargets.value = groupTargets.length > 0 ? groupTargets : [{ accountId: '', groupId: '' }];
+  triggerUserTargets.value = userTargets.length > 0 ? userTargets : [{ accountId: '', contactId: '' }];
+  triggerGroupTargetsEnabled.value = groupTargets.length > 0;
+  triggerUserTargetsEnabled.value = userTargets.length > 0;
+}
+
+function buildRuleOverridesPayload() {
+  const out: Record<string, unknown> = { ...triggerRuleOverridesBase.value };
+  if (!showSendMessageTargetsConfig.value) {
+    delete out.sendMessageTargets;
+    return out;
+  }
+  const groupTargets = triggerGroupTargetsEnabled.value
+    ? triggerGroupTargets.value
+      .filter((target) => target.accountId.trim() && target.groupId.trim())
+      .map((target) => ({ accountId: target.accountId.trim(), groupId: target.groupId.trim() }))
+    : [];
+  const userTargets = triggerUserTargetsEnabled.value
+    ? triggerUserTargets.value
+      .filter((target) => target.accountId.trim() && target.contactId.trim())
+      .map((target) => ({ accountId: target.accountId.trim(), contactId: target.contactId.trim() }))
+    : [];
+  if (groupTargets.length > 0 || userTargets.length > 0) {
+    out.sendMessageTargets = {
+      ...(groupTargets.length > 0 ? { groupTargets } : {}),
+      ...(userTargets.length > 0 ? { userTargets } : {}),
+    };
+  } else {
+    delete out.sendMessageTargets;
+  }
+  return out;
+}
+
+function readGroupTargets(targets: unknown) {
+  if (!targets || typeof targets !== 'object' || Array.isArray(targets)) return [];
+  const rows = (targets as Record<string, unknown>).groupTargets;
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((item) => item as { accountId?: unknown; groupId?: unknown })
+    .filter((item) => typeof item.accountId === 'string' && item.accountId.trim() && typeof item.groupId === 'string' && item.groupId.trim())
+    .map((item) => ({ accountId: String(item.accountId).trim(), groupId: String(item.groupId).trim() }));
+}
+
+function readUserTargets(targets: unknown) {
+  if (!targets || typeof targets !== 'object' || Array.isArray(targets)) return [];
+  const rows = (targets as Record<string, unknown>).userTargets;
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((item) => item as { accountId?: unknown; contactId?: unknown })
+    .filter((item) => typeof item.accountId === 'string' && item.accountId.trim() && typeof item.contactId === 'string' && item.contactId.trim())
+    .map((item) => ({ accountId: String(item.accountId).trim(), contactId: String(item.contactId).trim() }));
 }
 
 function showToast(msg: string, color: 'success' | 'error' | 'info' = 'info') {
@@ -435,7 +733,23 @@ async function saveTrigger() {
     // Pack cron into eventFilter (backend cron-event-scheduler reads from here)
     if (draft.value.eventType === 'scheduled_cron') {
       payload.eventFilter = { cron: draft.value.cronExpr.trim() };
+      if (segmentKind.value === 'customer-list') {
+        if (!segmentCustomerListId.value.trim()) {
+          error.value = 'Cần CustomerList ID khi dùng customer-list';
+          saving.value = false;
+          return;
+        }
+        payload.segmentSpec = {
+          kind: 'customer-list',
+          listId: segmentCustomerListId.value.trim(),
+          ...(segmentBirthdayThisWeek.value ? { birthdayThisWeek: true } : {}),
+        };
+      } else {
+        payload.segmentSpec = null;
+      }
     }
+    const ruleOverrides = buildRuleOverridesPayload();
+    payload.ruleOverrides = Object.keys(ruleOverrides).length > 0 ? ruleOverrides : null;
     if (draft.value.id) await triggersApi.updateTrigger(draft.value.id, payload as any);
     else                await triggersApi.createTrigger(payload as any);
     editorOpen.value = false;
@@ -460,14 +774,80 @@ async function toggleTrigger(trig: AutomationTrigger) {
 }
 
 async function onManualRun(trig: AutomationTrigger) {
-  const contactId = prompt(`Chạy "${trig.name}" cho contactId nào?`);
-  if (contactId === null) return;
-  try {
-    await triggersApi.runTrigger(trig.id, contactId ? { contactId } : {});
-    showToast('Event đã emit. Worker sẽ pick task trong ~10s.', 'success');
-  } catch (err: any) {
-    showToast(err?.response?.data?.error ?? err?.message, 'error');
+  const canRunWithoutContact = hasDirectBlockTarget(trig) || (trig.eventType !== 'scheduled_cron' && hasConfiguredAudience(trig));
+  let contactId = '';
+  if (!canRunWithoutContact) {
+    const input = prompt(`Chạy "${trig.name}" cho contactId nào?`);
+    if (input === null) return;
+    contactId = input.trim();
   }
+  try {
+    const result = await triggersApi.runTrigger(trig.id, contactId ? { contactId } : {});
+    if (result.mode === 'direct_block_test' && result.outcome && result.outcome !== 'success') {
+      showToast(result.errorMessage || result.errorCode || 'Test block thất bại', 'error');
+      return;
+    }
+    if (result.mode === 'materialized') {
+      const tasks = result.materializeResult?.tasksEnqueued ?? 0;
+      showToast(
+        tasks > 0
+          ? `Đã tạo ${tasks} task để worker xử lý.`
+          : 'Không tạo được task mới.',
+        tasks > 0 ? 'success' : 'error',
+      );
+      return;
+    }
+    showToast(
+      result.mode === 'direct_block_test'
+        ? 'Đã chạy test block trực tiếp.'
+        : 'Event đã emit. Worker sẽ pick task trong ~10s.',
+      'success',
+    );
+  } catch (err: any) {
+    const data = err?.response?.data;
+    const reasons = Array.isArray(data?.materializeResult?.reasons)
+      ? data.materializeResult.reasons.filter(Boolean).join('; ')
+      : '';
+    showToast(reasons || data?.error || err?.message, 'error');
+  }
+}
+
+function triggerBlock(trig: AutomationTrigger): Block | null {
+  if (!trig.blockId) return null;
+  return blocks.value.find((b) => b.id === trig.blockId) ?? null;
+}
+
+function hasDirectBlockTarget(trig: AutomationTrigger): boolean {
+  const block = triggerBlock(trig);
+  if (!block || block.actionType !== 'send_message') return false;
+  const triggerTargets = trig.ruleOverrides?.sendMessageTargets;
+  if (readGroupTargets(triggerTargets).length > 0 || readUserTargets(triggerTargets).length > 0) return true;
+  const groupTarget = block.content?.groupTarget as { accountId?: unknown; groupId?: unknown } | undefined;
+  const groupTargets = block.content?.groupTargets as Array<{ accountId?: unknown; groupId?: unknown }> | undefined;
+  const userTargets = block.content?.userTargets as Array<{ accountId?: unknown; contactId?: unknown }> | undefined;
+  const hasLegacyGroupTarget = (
+    typeof groupTarget?.accountId === 'string'
+    && groupTarget.accountId.trim().length > 0
+    && typeof groupTarget.groupId === 'string'
+    && groupTarget.groupId.trim().length > 0
+  );
+  const hasGroupTargets = Array.isArray(groupTargets) && groupTargets.some((target) => (
+    typeof target.accountId === 'string'
+    && target.accountId.trim().length > 0
+    && typeof target.groupId === 'string'
+    && target.groupId.trim().length > 0
+  ));
+  const hasUserTargets = Array.isArray(userTargets) && userTargets.some((target) => (
+    typeof target.accountId === 'string'
+    && target.accountId.trim().length > 0
+    && typeof target.contactId === 'string'
+    && target.contactId.trim().length > 0
+  ));
+  return hasLegacyGroupTarget || hasGroupTargets || hasUserTargets;
+}
+
+function hasConfiguredAudience(trig: AutomationTrigger): boolean {
+  return Boolean(trig.segmentSpec && typeof trig.segmentSpec === 'object');
 }
 
 async function onDelete(trig: AutomationTrigger) {
@@ -547,6 +927,45 @@ async function onDelete(trig: AutomationTrigger) {
   background: var(--at-ink);
   color: var(--at-on-primary);
   border-color: var(--at-ink);
+}
+
+.trigger-targets {
+  padding: var(--at-s-sm);
+  border: 1px solid var(--at-hairline);
+  border-radius: var(--at-r-md);
+  background: var(--at-surface-soft);
+}
+
+.trigger-targets__toggle {
+  margin-top: var(--at-s-sm);
+}
+
+.trigger-target-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) minmax(240px, 1fr) 32px;
+  gap: 8px;
+  align-items: start;
+  margin-bottom: 8px;
+}
+
+.trigger-target-row__remove {
+  min-width: 32px;
+  height: 36px;
+}
+
+@media (max-width: 720px) {
+  .trigger-target-row {
+    grid-template-columns: 1fr 32px;
+  }
+
+  .trigger-target-row .at-input {
+    grid-column: 1 / 2;
+  }
+
+  .trigger-target-row__remove {
+    grid-column: 2 / 3;
+    grid-row: 1 / 2;
+  }
 }
 
 /* Groups */
@@ -753,12 +1172,16 @@ async function onDelete(trig: AutomationTrigger) {
   background: var(--at-canvas);
   border-radius: var(--at-r-md);
   overflow: hidden;
+  max-height: calc(100dvh - 48px);
+  display: flex;
+  flex-direction: column;
 }
 .editor-card__head {
   display: flex;
   align-items: center;
   gap: var(--at-s-sm);
   padding: var(--at-s-md);
+  flex: 0 0 auto;
 }
 .editor-card__close {
   margin-left: auto;
@@ -775,12 +1198,15 @@ async function onDelete(trig: AutomationTrigger) {
   display: flex;
   flex-direction: column;
   gap: var(--at-s-sm);
+  min-height: 0;
+  overflow-y: auto;
 }
 .editor-card__foot {
   padding: var(--at-s-md);
   display: flex;
   justify-content: flex-end;
   gap: var(--at-s-xs);
+  flex: 0 0 auto;
 }
 
 .form-field { display: flex; flex-direction: column; gap: 6px; }

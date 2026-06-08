@@ -71,6 +71,30 @@ export interface SendMessageContent {
   textVariants: string[];
   attachments?: MessageAttachment[];
   aiImagePrompt?: AiImagePrompt;
+  // Optional direct group destination for legacy single-target blocks.
+  // New blocks should prefer `groupTargets[]`.
+  groupTarget?: {
+    accountId: string;
+    groupId: string;
+  };
+  // Batch group targets. Each item sends to a Zalo group thread with the
+  // selected nick. Engine sends them sequentially with a delay between sends.
+  groupTargets?: Array<{
+    accountId: string;
+    groupId: string;
+  }>;
+  // Batch user targets. Each item sends to a contact thread with the selected nick.
+  userTargets?: Array<{
+    accountId: string;
+    contactId: string;
+  }>;
+  // Optional HTML template rendered into an image file before sending.
+  htmlImageTemplate?: {
+    html: string;
+    width?: number;
+    height?: number;
+    failOpen?: boolean;
+  };
 }
 
 export interface UpdateStatusContent {
@@ -161,6 +185,78 @@ export function validateBlockContent(
         }
         if (ai.failOpen !== undefined && typeof ai.failOpen !== 'boolean') {
           return { ok: false, error: 'aiImagePrompt.failOpen phải là boolean' };
+        }
+      }
+
+      const groupTarget = c.groupTarget;
+      if (groupTarget !== undefined && groupTarget !== null) {
+        if (typeof groupTarget !== 'object') {
+          return { ok: false, error: 'groupTarget phải là object' };
+        }
+        const gt = groupTarget as Record<string, unknown>;
+        if (typeof gt.accountId !== 'string' || !gt.accountId.trim()) {
+          return { ok: false, error: 'groupTarget.accountId phải là chuỗi không rỗng' };
+        }
+        if (typeof gt.groupId !== 'string' || !gt.groupId.trim()) {
+          return { ok: false, error: 'groupTarget.groupId phải là chuỗi không rỗng' };
+        }
+      }
+
+      const groupTargets = c.groupTargets;
+      if (groupTargets !== undefined && groupTargets !== null) {
+        if (!Array.isArray(groupTargets) || groupTargets.length === 0) {
+          return { ok: false, error: 'groupTargets phải là mảng có ít nhất 1 phần tử' };
+        }
+        for (const item of groupTargets) {
+          if (typeof item !== 'object' || item === null) {
+            return { ok: false, error: 'mỗi groupTargets item phải là object' };
+          }
+          const gt = item as Record<string, unknown>;
+          if (typeof gt.accountId !== 'string' || !gt.accountId.trim()) {
+            return { ok: false, error: 'groupTargets.accountId phải là chuỗi không rỗng' };
+          }
+          if (typeof gt.groupId !== 'string' || !gt.groupId.trim()) {
+            return { ok: false, error: 'groupTargets.groupId phải là chuỗi không rỗng' };
+          }
+        }
+      }
+
+      const userTargets = c.userTargets;
+      if (userTargets !== undefined && userTargets !== null) {
+        if (!Array.isArray(userTargets) || userTargets.length === 0) {
+          return { ok: false, error: 'userTargets phải là mảng có ít nhất 1 phần tử' };
+        }
+        for (const item of userTargets) {
+          if (typeof item !== 'object' || item === null) {
+            return { ok: false, error: 'mỗi userTargets item phải là object' };
+          }
+          const ut = item as Record<string, unknown>;
+          if (typeof ut.accountId !== 'string' || !ut.accountId.trim()) {
+            return { ok: false, error: 'userTargets.accountId phải là chuỗi không rỗng' };
+          }
+          if (typeof ut.contactId !== 'string' || !ut.contactId.trim()) {
+            return { ok: false, error: 'userTargets.contactId phải là chuỗi không rỗng' };
+          }
+        }
+      }
+
+      const htmlTpl = c.htmlImageTemplate;
+      if (htmlTpl !== undefined && htmlTpl !== null) {
+        if (typeof htmlTpl !== 'object') {
+          return { ok: false, error: 'htmlImageTemplate phải là object' };
+        }
+        const tpl = htmlTpl as Record<string, unknown>;
+        if (typeof tpl.html !== 'string' || !tpl.html.trim()) {
+          return { ok: false, error: 'htmlImageTemplate.html phải là chuỗi không rỗng' };
+        }
+        if (tpl.width !== undefined && (typeof tpl.width !== 'number' || tpl.width < 320 || tpl.width > 3000)) {
+          return { ok: false, error: 'htmlImageTemplate.width phải là số trong khoảng 320-3000' };
+        }
+        if (tpl.height !== undefined && (typeof tpl.height !== 'number' || tpl.height < 320 || tpl.height > 4000)) {
+          return { ok: false, error: 'htmlImageTemplate.height phải là số trong khoảng 320-4000' };
+        }
+        if (tpl.failOpen !== undefined && typeof tpl.failOpen !== 'boolean') {
+          return { ok: false, error: 'htmlImageTemplate.failOpen phải là boolean' };
         }
       }
       return { ok: true };

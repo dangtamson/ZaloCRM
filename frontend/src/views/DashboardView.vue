@@ -40,7 +40,7 @@ import { useDashboard } from '@/composables/use-dashboard';
 // Apache 2.0 §4(d) attribution — see src/composables/use-attribution.ts + NOTICE
 import { useAttribution } from '@/composables/use-attribution';
 
-const attribution = useAttribution();
+useAttribution();
 
 const {
   kpi, messageVolume, pipeline, sources, appointments,

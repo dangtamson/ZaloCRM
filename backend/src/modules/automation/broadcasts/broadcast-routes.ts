@@ -33,6 +33,20 @@ const DEFAULT_PACING = {
   randomDelayBetweenSends: { min: 15, max: 45 },
 };
 
+function getBirthdayWeekMonthDayKeys(now: Date): Set<number> {
+  const day = now.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday);
+  const keys = new Set<number>();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    keys.add((d.getMonth() + 1) * 100 + d.getDate());
+  }
+  return keys;
+}
+
 // Resolve segment to contactIds (mirrors campaign-materializer logic)
 async function resolveSegmentContactIds(orgId: string, spec: unknown): Promise<string[]> {
   if (!spec || typeof spec !== 'object') return [];
@@ -62,13 +76,32 @@ async function resolveSegmentContactIds(orgId: string, spec: unknown): Promise<s
         customerListId: s.listId,
         status: { in: ['enriched', 'validated'] },
         phoneValid: true,
+        ...(s.birthdayThisWeek === true ? { birthDate: { not: null } } : {}),
       },
-      select: { phoneE164: true, contactId: true },
+      select: { phoneE164: true, contactId: true, dupWithContactId: true, birthDate: true } as never,
       take: 50000,
-    });
-    const linkedContactIds = entries.map((e) => e.contactId).filter((id): id is string => Boolean(id));
+    }) as Array<{
+      phoneE164: string | null;
+      contactId: string | null;
+      dupWithContactId: string | null;
+      birthDate: Date | null;
+    }>;
+
+    const weekKeys = s.birthdayThisWeek === true
+      ? getBirthdayWeekMonthDayKeys(new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' })))
+      : null;
+    const inWeek = (birthDate: Date | null): boolean => {
+      if (!weekKeys) return true;
+      if (!birthDate) return false;
+      return weekKeys.has((new Date(birthDate).getMonth() + 1) * 100 + new Date(birthDate).getDate());
+    };
+
+    const linkedContactIds = entries
+      .filter((e) => inWeek(e.birthDate))
+      .flatMap((e) => [e.contactId, e.dupWithContactId])
+      .filter((id): id is string => Boolean(id));
     const phones84 = entries
-      .filter((e) => !e.contactId && e.phoneE164)
+      .filter((e) => !e.contactId && !e.dupWithContactId && e.phoneE164 && inWeek(e.birthDate))
       .map((e) => e.phoneE164!.replace(/^\+/, ''));
     if (linkedContactIds.length === 0 && phones84.length === 0) return [];
     const allIds = new Set<string>(linkedContactIds);
@@ -232,12 +265,12 @@ export async function broadcastRoutes(app: FastifyInstance): Promise<void> {
     const friendableCount = contactIds.length === 0
       ? 0
       : await prisma.contact.count({
-          where: {
-            id: { in: contactIds },
-            orgId: user.orgId,
-            acceptedNicksCount: { gt: 0 },
-          },
-        });
+        where: {
+          id: { in: contactIds },
+          orgId: user.orgId,
+          acceptedNicksCount: { gt: 0 },
+        },
+      });
 
     return {
       totalResolved: contactIds.length,

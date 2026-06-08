@@ -145,6 +145,25 @@ export async function contactRoutes(app: FastifyInstance): Promise<void> {
           include: {
             assignedUser: { select: { id: true, fullName: true, email: true } },
             _count: { select: { conversations: true, appointments: true } },
+            ...(threadType === 'group' ? {
+              conversations: {
+                where: {
+                  orgId: user.orgId,
+                  threadType: 'group',
+                  externalThreadId: { not: null },
+                },
+                select: {
+                  id: true,
+                  zaloAccountId: true,
+                  externalThreadId: true,
+                  threadType: true,
+                  groupName: true,
+                  groupAvatarUrl: true,
+                },
+                orderBy: { lastMessageAt: { sort: 'desc', nulls: 'last' } },
+                take: 5,
+              },
+            } : {}),
             ...AGGREGATE_INCLUDE,
           },
           orderBy: [

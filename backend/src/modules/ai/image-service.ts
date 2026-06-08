@@ -17,6 +17,7 @@
  *     defense-in-depth in case the schema later allows other shapes.
  */
 import { promises as fs } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { config } from '../../config/index.js';
@@ -63,7 +64,11 @@ export function resolveImageProvider(provider?: string): ImageProviderId {
  */
 export function getStorageRoot(): string {
     if (config.aiImageStorageDir) return path.resolve(config.aiImageStorageDir);
-    return path.resolve(process.cwd(), '..', 'assets', 'posts', 'automation');
+    const cwdRoot = path.resolve(process.cwd(), 'assets', 'posts', 'automation');
+    if (existsSync(cwdRoot)) return cwdRoot;
+    const backendCwdRoot = path.resolve(process.cwd(), '..', 'assets', 'posts', 'automation');
+    if (existsSync(backendCwdRoot)) return backendCwdRoot;
+    return cwdRoot;
 }
 
 function extensionFromMime(mime: string): string {

@@ -29,7 +29,11 @@ import {
   type TriggerBindingKind,
 } from './types.js';
 import { automationEventBus } from '../engine/event-bus.js';
+import { materializeFromEvent } from '../engine/campaign-materializer.js';
 import { registerCronTrigger, unregisterCronTrigger } from '../engine/cron-event-scheduler.js';
+import { sendMessageHandler } from '../engine/action-handlers/send-message.js';
+import { hasExplicitSendMessageTargets } from '../engine/send-message-targets.js';
+import { applySendMessageTargetOverrides } from '../engine/send-message-trigger-targets.js';
 
 const BASE = '/api/v1/automation/triggers';
 
@@ -247,20 +251,98 @@ export async function triggerRoutes(app: FastifyInstance): Promise<void> {
 
       const trigger = await prisma.automationTrigger.findFirst({
         where: { id, orgId: user.orgId },
-        select: { id: true, eventType: true, enabled: true },
+        select: {
+          id: true,
+          eventType: true,
+          enabled: true,
+          bindingKind: true,
+          blockId: true,
+          eventFilter: true,
+          segmentSpec: true,
+          ruleOverrides: true,
+        },
       });
       if (!trigger) return reply.status(404).send({ error: 'trigger not found' });
       if (!trigger.enabled) return reply.status(409).send({ error: 'trigger is disabled' });
 
-      // Emit event — async, returns immediately. Engine handles enrollment.
-      automationEventBus.emit({
+      const manualContactId = typeof body.contactId === 'string' && body.contactId.trim()
+        ? body.contactId.trim()
+        : undefined;
+      const materializesScheduledCustomerList = shouldMaterializeScheduledCronCustomerList(trigger);
+
+      if (trigger.bindingKind === 'block' && trigger.blockId) {
+        const block = await prisma.block.findFirst({
+          where: { id: trigger.blockId, orgId: user.orgId },
+          select: { id: true, actionType: true, content: true, archivedAt: true },
+        });
+        const blockSnapshot = block
+          ? applySendMessageTargetOverrides(block.content, trigger.ruleOverrides)
+          : undefined;
+        const hasSendTargets = Boolean(blockSnapshot && hasExplicitSendMessageTargets(blockSnapshot));
+        const shouldRunDirectBlockTest = materializesScheduledCustomerList
+          ? Boolean(manualContactId && !hasSendTargets)
+          : hasSendTargets;
+        if (
+          block?.actionType === 'send_message'
+          && !block.archivedAt
+          && blockSnapshot
+          && shouldRunDirectBlockTest
+        ) {
+          const sampleContact = manualContactId
+            ? { id: manualContactId }
+            : await prisma.contact.findFirst({
+              where: { orgId: user.orgId, mergedInto: null },
+              select: { id: true },
+              orderBy: { createdAt: 'asc' },
+            });
+          const actionResult = await sendMessageHandler({
+            orgId: user.orgId,
+            taskId: `manual-${trigger.id}`,
+            contactId: sampleContact?.id ?? '',
+            assignedNickId: null,
+            blockSnapshot,
+            actionType: 'send_message',
+            attemptCount: 0,
+          });
+
+          return reply.status(200).send({
+            accepted: true,
+            triggerId: id,
+            eventType: trigger.eventType,
+            mode: 'direct_block_test',
+            sampleContactId: sampleContact?.id ?? null,
+            outcome: actionResult.outcome,
+            data: actionResult.data ?? null,
+            errorCode: actionResult.errorCode,
+            errorMessage: actionResult.errorMessage,
+          });
+        }
+      }
+
+      const event = {
         type: trigger.eventType as never, // narrowed: eventType column constrained at trigger create
         orgId: user.orgId,
         occurredAt: new Date(),
-        contactId: typeof body.contactId === 'string' ? body.contactId : undefined,
+        contactId: manualContactId,
         segmentHint: body.segmentHint && typeof body.segmentHint === 'object' ? body.segmentHint : undefined,
-        payload: body.payload,
-      });
+        payload: buildManualRunPayload(trigger, body.payload),
+      };
+
+      if (materializesScheduledCustomerList) {
+        const materializeResult = await materializeFromEvent(event);
+        const accepted = materializeResult.tasksEnqueued > 0;
+        return reply.status(accepted ? 200 : 409).send({
+          accepted,
+          triggerId: id,
+          eventType: trigger.eventType,
+          mode: 'materialized',
+          materializeResult,
+          ...(accepted ? {} : { error: 'No automation tasks were created' }),
+        });
+      }
+
+      // Emit event — async, returns immediately. Engine handles enrollment.
+      automationEventBus.emit(event);
 
       return reply.status(202).send({
         accepted: true,
@@ -303,6 +385,30 @@ export async function triggerRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(500).send({ error: 'Failed to delete trigger' });
     }
   });
+}
+
+function shouldMaterializeScheduledCronCustomerList(trigger: {
+  eventType: string;
+  segmentSpec?: unknown;
+}): boolean {
+  if (trigger.eventType !== 'scheduled_cron') return false;
+  const spec = trigger.segmentSpec;
+  return Boolean(spec && typeof spec === 'object' && (spec as Record<string, unknown>).kind === 'customer-list');
+}
+
+function buildManualRunPayload(
+  trigger: { id: string; eventType: string; eventFilter?: unknown },
+  explicitPayload: unknown,
+): unknown {
+  if (explicitPayload !== undefined) return explicitPayload;
+  if (trigger.eventType !== 'scheduled_cron') return undefined;
+  const filter = trigger.eventFilter && typeof trigger.eventFilter === 'object'
+    ? trigger.eventFilter as Record<string, unknown>
+    : {};
+  return {
+    triggerId: trigger.id,
+    ...(typeof filter.cron === 'string' ? { cron: filter.cron } : {}),
+  };
 }
 
 async function toggleEnabled(request: FastifyRequest, reply: FastifyReply, enabled: boolean) {

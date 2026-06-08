@@ -123,6 +123,41 @@
                     <option v-for="(h, i) in fileHeaders" :key="'g'+i" :value="i">{{ h || `Cột ${i+1}` }}</option>
                   </select>
                 </div>
+                <div class="map-cell">
+                  <span class="map-label">🎂 Ngày sinh</span>
+                  <select v-model="mapping.birthDate">
+                    <option :value="null">— Không map —</option>
+                    <option v-for="(h, i) in fileHeaders" :key="'b'+i" :value="i">{{ h || `Cột ${i+1}` }}</option>
+                  </select>
+                </div>
+                <div class="map-cell">
+                  <span class="map-label">👤 Giới tính</span>
+                  <select v-model="mapping.gender">
+                    <option :value="null">— Không map —</option>
+                    <option v-for="(h, i) in fileHeaders" :key="'ge'+i" :value="i">{{ h || `Cột ${i+1}` }}</option>
+                  </select>
+                </div>
+                <div class="map-cell">
+                  <span class="map-label">💼 Chức vụ</span>
+                  <select v-model="mapping.occupation">
+                    <option :value="null">— Không map —</option>
+                    <option v-for="(h, i) in fileHeaders" :key="'o'+i" :value="i">{{ h || `Cột ${i+1}` }}</option>
+                  </select>
+                </div>
+                <div class="map-cell">
+                  <span class="map-label">🏢 Đơn vị</span>
+                  <select v-model="mapping.unit">
+                    <option :value="null">— Không map —</option>
+                    <option v-for="(h, i) in fileHeaders" :key="'u'+i" :value="i">{{ h || `Cột ${i+1}` }}</option>
+                  </select>
+                </div>
+                <div class="map-cell">
+                  <span class="map-label">🎉 Lời chúc sinh nhật</span>
+                  <select v-model="mapping.birthdayWish">
+                    <option :value="null">— Không map —</option>
+                    <option v-for="(h, i) in fileHeaders" :key="'bw'+i" :value="i">{{ h || `Cột ${i+1}` }}</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -135,6 +170,11 @@
                     <th>SĐT</th>
                     <th>Tên</th>
                     <th>Lời mời / tin nhắn</th>
+                    <th>Ngày sinh</th>
+                    <th>Giới tính</th>
+                    <th>Chức vụ</th>
+                    <th>Đơn vị</th>
+                    <th>Lời chúc sinh nhật</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -143,6 +183,11 @@
                     <td><code>{{ r.phone }}</code></td>
                     <td>{{ r.name || '—' }}</td>
                     <td class="note-cell">{{ r.personalNote || '—' }}</td>
+                    <td>{{ r.birthDate || '—' }}</td>
+                    <td>{{ r.gender || '—' }}</td>
+                    <td>{{ r.occupation || '—' }}</td>
+                    <td>{{ r.unit || '—' }}</td>
+                    <td class="note-cell">{{ r.birthdayWish || '—' }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -285,8 +330,17 @@ const fileError = ref<string | null>(null);
 const fileName = ref('');
 const fileHeaders = ref<string[]>([]);
 const fileRows = ref<string[][]>([]);
-const mapping = ref<{ phone: number | null; name: number | null; note: number | null }>({
-  phone: null, name: null, note: null,
+const mapping = ref<{
+  phone: number | null;
+  name: number | null;
+  note: number | null;
+  birthDate: number | null;
+  gender: number | null;
+  occupation: number | null;
+  unit: number | null;
+  birthdayWish: number | null;
+}>({
+  phone: null, name: null, note: null, birthDate: null, gender: null, occupation: null, unit: null, birthdayWish: null,
 });
 
 function triggerFilePicker() { filePickerRef.value?.click(); }
@@ -354,8 +408,12 @@ async function handleFile(file: File) {
   }
 }
 
+function emptyMapping() {
+  return { phone: null, name: null, note: null, birthDate: null, gender: null, occupation: null, unit: null, birthdayWish: null };
+}
+
 function autoGuessMapping(headers: string[]) {
-  mapping.value = { phone: null, name: null, note: null };
+  mapping.value = emptyMapping();
   headers.forEach((h, i) => {
     const lo = h.toLowerCase();
     if (mapping.value.phone == null && /sđt|sdt|phone|đt\b|dt\b|số.*đt|số.*điện/.test(lo)) {
@@ -364,6 +422,16 @@ function autoGuessMapping(headers: string[]) {
       mapping.value.name = i;
     } else if (mapping.value.note == null && /ghi.*chú|ghi.*chu|note|mời|moi|lời.*mời|tin.*nhắn|message/.test(lo)) {
       mapping.value.note = i;
+    } else if (mapping.value.birthDate == null && /ngày.*sinh|ngay.*sinh|birthday|birth.*date|dob/.test(lo)) {
+      mapping.value.birthDate = i;
+    } else if (mapping.value.gender == null && /giới.*tính|gioi.*tinh|gender|sex/.test(lo)) {
+      mapping.value.gender = i;
+    } else if (mapping.value.occupation == null && /chức.*vụ|chuc.*vu|occupation|position|title/.test(lo)) {
+      mapping.value.occupation = i;
+    } else if (mapping.value.unit == null && /đơn.*vị|don.*vi|phòng.*ban|phong.*ban|bộ.*phận|bo.*phan|unit|department|dept/.test(lo)) {
+      mapping.value.unit = i;
+    } else if (mapping.value.birthdayWish == null && /lời.*chúc.*sinh.*nhật|loi.*chuc.*sinh.*nhat|chúc.*sinh.*nhật|chuc.*sinh.*nhat|birthday.*wish|birthday.*message/.test(lo)) {
+      mapping.value.birthdayWish = i;
     }
   });
   // Fallback: nếu không đoán được phone, lấy cột đầu tiên
@@ -375,7 +443,7 @@ function resetFile() {
   fileHeaders.value = [];
   fileRows.value = [];
   fileError.value = null;
-  mapping.value = { phone: null, name: null, note: null };
+  mapping.value = emptyMapping();
   dryRunResult.value = null;
   if (filePickerRef.value) filePickerRef.value.value = '';
 }
@@ -385,11 +453,21 @@ const mappedRows = computed<MappedRow[]>(() => {
   const pIdx = mapping.value.phone;
   const nIdx = mapping.value.name;
   const gIdx = mapping.value.note;
+  const bIdx = mapping.value.birthDate;
+  const genderIdx = mapping.value.gender;
+  const oIdx = mapping.value.occupation;
+  const uIdx = mapping.value.unit;
+  const bwIdx = mapping.value.birthdayWish;
   return fileRows.value
     .map((r) => ({
       phone: r[pIdx] ?? '',
       name: nIdx != null ? (r[nIdx] || null) : null,
       personalNote: gIdx != null ? (r[gIdx] || null) : null,
+      birthDate: bIdx != null ? (r[bIdx] || null) : null,
+      gender: genderIdx != null ? (r[genderIdx] || null) : null,
+      occupation: oIdx != null ? (r[oIdx] || null) : null,
+      unit: uIdx != null ? (r[uIdx] || null) : null,
+      birthdayWish: bwIdx != null ? (r[bwIdx] || null) : null,
     }))
     .filter((r) => r.phone && r.phone.trim());
 });

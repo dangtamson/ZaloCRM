@@ -75,7 +75,22 @@ export interface ManualRunInput {
   payload?: Record<string, unknown>;
 }
 
-export async function runTrigger(id: string, input: ManualRunInput = {}): Promise<{ accepted: boolean; triggerId: string; eventType: string }> {
+export async function runTrigger(id: string, input: ManualRunInput = {}): Promise<{
+  accepted: boolean;
+  triggerId: string;
+  eventType: string;
+  mode?: 'direct_block_test' | 'materialized';
+  outcome?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  data?: Record<string, unknown> | null;
+  materializeResult?: {
+    campaignsCreated: number;
+    tasksEnqueued: number;
+    skipped: number;
+    reasons: string[];
+  };
+}> {
   const { data } = await api.post(`${BASE}/${id}/run`, input);
   return data;
 }

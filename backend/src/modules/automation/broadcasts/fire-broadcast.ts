@@ -9,6 +9,20 @@ import { prisma } from '../../../shared/database/prisma-client.js';
 import { logger } from '../../../shared/utils/logger.js';
 import { sanitizeContactCriteria, sanitizeManualContactIds } from '../engine/segment-sanitizer.js';
 
+function getBirthdayWeekMonthDayKeys(now: Date): Set<number> {
+  const day = now.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday);
+  const keys = new Set<number>();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    keys.add((d.getMonth() + 1) * 100 + d.getDate());
+  }
+  return keys;
+}
+
 interface BroadcastRow {
   id: string;
   orgId: string;
@@ -45,13 +59,13 @@ export async function resolveAndEnqueue(bc: BroadcastRow): Promise<{ recipients:
   const friendableContacts = allContactIds.length === 0
     ? []
     : await prisma.contact.findMany({
-        where: {
-          id: { in: allContactIds },
-          orgId: bc.orgId,
-          acceptedNicksCount: { gt: 0 },
-        },
-        select: { id: true },
-      });
+      where: {
+        id: { in: allContactIds },
+        orgId: bc.orgId,
+        acceptedNicksCount: { gt: 0 },
+      },
+      select: { id: true },
+    });
   const recipientIds = friendableContacts.map((c) => c.id);
 
   // 3. Update broadcast totals (state already 'running' from atomic claim above)
@@ -154,17 +168,33 @@ async function resolveSegmentContactIds(orgId: string, spec: unknown): Promise<s
         customerListId: s.listId,
         status: { in: ['enriched', 'validated'] },
         phoneValid: true,
+        ...(s.birthdayThisWeek === true ? { birthDate: { not: null } } : {}),
       },
-      select: { phoneE164: true, contactId: true },
+      select: { phoneE164: true, contactId: true, dupWithContactId: true, birthDate: true } as never,
       take: 50000,
-    });
+    }) as Array<{
+      phoneE164: string | null;
+      contactId: string | null;
+      dupWithContactId: string | null;
+      birthDate: Date | null;
+    }>;
+
+    const weekKeys = s.birthdayThisWeek === true
+      ? getBirthdayWeekMonthDayKeys(new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' })))
+      : null;
+    const inWeek = (birthDate: Date | null): boolean => {
+      if (!weekKeys) return true;
+      if (!birthDate) return false;
+      return weekKeys.has((new Date(birthDate).getMonth() + 1) * 100 + new Date(birthDate).getDate());
+    };
 
     // Prefer direct contactId link if set, else match via phone
     const linkedContactIds = entries
-      .map((e) => e.contactId)
+      .filter((e) => inWeek(e.birthDate))
+      .flatMap((e) => [e.contactId, e.dupWithContactId])
       .filter((id): id is string => Boolean(id));
     const phones84 = entries
-      .filter((e) => !e.contactId && e.phoneE164)
+      .filter((e) => !e.contactId && !e.dupWithContactId && e.phoneE164 && inWeek(e.birthDate))
       .map((e) => e.phoneE164!.replace(/^\+/, '')); // "+84xxx" → "84xxx"
 
     if (linkedContactIds.length === 0 && phones84.length === 0) return [];

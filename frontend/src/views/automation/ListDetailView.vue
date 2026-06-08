@@ -264,6 +264,11 @@
             <th v-show="isColVisible('nameRaw')">Tên KH (file)</th>
             <th v-show="isColVisible('nameZalo')">Tên KH (Zalo)</th>
             <th v-show="isColVisible('personalNote')"   title="Lời mời / tin nhắn riêng cho KH này (chỉ có khi import từ CSV/Excel)">💬 Lời mời riêng</th>
+            <th v-show="isColVisible('birthDate')"      title="Ngày sinh">🎂 Ngày sinh</th>
+            <th v-show="isColVisible('gender')"         title="Giới tính">👤 Giới tính</th>
+            <th v-show="isColVisible('occupation')"     title="Chức vụ">💼 Chức vụ</th>
+            <th v-show="isColVisible('unit')"           title="Đơn vị">🏢 Đơn vị</th>
+            <th v-show="isColVisible('birthdayWish')"   title="Lời chúc sinh nhật riêng">🎉 Lời chúc sinh nhật</th>
             <th v-show="isColVisible('lifecycle')"      title="Lifecycle 5 ô: Mới / Đang chờ Quét / Có Zalo / Không có Zalo / Lỗi">🔄 Trạng thái</th>
             <th v-show="isColVisible('zaloUid')">Zalo UID</th>
             <th v-show="isColVisible('resolvedByNick')">Nick tìm ra</th>
@@ -363,6 +368,88 @@
               />
               <span v-else-if="entry.personalNote" class="cell-content">{{ entry.personalNote }}</span>
               <span v-else class="muted-italic">(click để thêm)</span>
+            </td>
+            <!-- Editable birthDate -->
+            <td v-show="isColVisible('birthDate')" class="birth-date editable cell-scroll" :title="entry.birthDate || 'Click để thêm ngày sinh'" @click.stop="startEdit(entry.id, 'birthDate', entry.birthDate ? entry.birthDate.slice(0, 10) : '')">
+              <input
+                v-if="editing && editing.entryId === entry.id && editing.field === 'birthDate'"
+                v-model="editing.value"
+                type="date"
+                class="cell-input"
+                :disabled="savingEntryId === entry.id"
+                ref="editInputRef"
+                @click.stop
+                @keydown.enter="commitEdit"
+                @keydown.esc="cancelEdit"
+                @blur="commitEdit"
+              />
+              <span v-else-if="entry.birthDate" class="cell-content">{{ formatDate(entry.birthDate) }}</span>
+              <span v-else class="muted-italic">(click để thêm)</span>
+            </td>
+            <!-- Editable gender -->
+            <td v-show="isColVisible('gender')" class="gender editable cell-scroll" :title="entry.gender || 'Click để thêm giới tính'" @click.stop="startEdit(entry.id, 'gender', entry.gender ?? '')">
+              <input
+                v-if="editing && editing.entryId === entry.id && editing.field === 'gender'"
+                v-model="editing.value"
+                class="cell-input"
+                :disabled="savingEntryId === entry.id"
+                placeholder="Nam/Nữ/Khác"
+                ref="editInputRef"
+                @click.stop
+                @keydown.enter="commitEdit"
+                @keydown.esc="cancelEdit"
+                @blur="commitEdit"
+              />
+              <span v-else-if="entry.gender" class="cell-content">{{ entry.gender }}</span>
+              <span v-else class="muted-italic">(click để thêm)</span>
+            </td>
+            <!-- Editable occupation -->
+            <td v-show="isColVisible('occupation')" class="occupation editable cell-scroll" :title="entry.occupation || 'Click để thêm chức vụ'" @click.stop="startEdit(entry.id, 'occupation', entry.occupation ?? '')">
+              <input
+                v-if="editing && editing.entryId === entry.id && editing.field === 'occupation'"
+                v-model="editing.value"
+                class="cell-input"
+                :disabled="savingEntryId === entry.id"
+                ref="editInputRef"
+                @click.stop
+                @keydown.enter="commitEdit"
+                @keydown.esc="cancelEdit"
+                @blur="commitEdit"
+              />
+              <span v-else-if="entry.occupation" class="cell-content">{{ entry.occupation }}</span>
+              <span v-else class="muted-italic">(click để thêm)</span>
+            </td>
+            <!-- Editable unit -->
+            <td v-show="isColVisible('unit')" class="unit editable cell-scroll" :title="entry.unit || 'Click để thêm đơn vị'" @click.stop="startEdit(entry.id, 'unit', entry.unit ?? '')">
+              <input
+                v-if="editing && editing.entryId === entry.id && editing.field === 'unit'"
+                v-model="editing.value"
+                class="cell-input"
+                :disabled="savingEntryId === entry.id"
+                ref="editInputRef"
+                @click.stop
+                @keydown.enter="commitEdit"
+                @keydown.esc="cancelEdit"
+                @blur="commitEdit"
+              />
+              <span v-else-if="entry.unit" class="cell-content">{{ entry.unit }}</span>
+              <span v-else class="muted-italic">(click để thêm)</span>
+            </td>
+            <!-- Editable birthdayWish -->
+            <td v-show="isColVisible('birthdayWish')" class="birthday-wish editable cell-scroll" :title="entry.birthdayWish || 'Click để thêm lời chúc sinh nhật riêng'" @click.stop="startEdit(entry.id, 'birthdayWish', entry.birthdayWish ?? '')">
+              <input
+                v-if="editing && editing.entryId === entry.id && editing.field === 'birthdayWish'"
+                v-model="editing.value"
+                class="cell-input"
+                :disabled="savingEntryId === entry.id"
+                ref="editInputRef"
+                @click.stop
+                @keydown.enter="commitEdit"
+                @keydown.esc="cancelEdit"
+                @blur="commitEdit"
+              />
+              <span v-else-if="entry.birthdayWish" class="cell-content">{{ entry.birthdayWish }}</span>
+              <span v-else class="muted-italic">(mặc định)</span>
             </td>
             <!-- Cột 1: Lifecycle (5 ô cố định) -->
             <td v-show="isColVisible('lifecycle')" class="lifecycle-cell">
@@ -709,8 +796,8 @@ function cancelEditTitle() {
   titleDraft.value = '';
 }
 
-// ───────── Inline edit: cells (phoneRaw / nameRaw / personalNote) ─────────
-type EditField = 'phoneRaw' | 'nameRaw' | 'personalNote';
+// ───────── Inline edit: cells (phoneRaw / nameRaw / personalNote / birthDate / gender / occupation / unit / birthdayWish) ─────────
+type EditField = 'phoneRaw' | 'nameRaw' | 'personalNote' | 'birthDate' | 'gender' | 'occupation' | 'unit' | 'birthdayWish';
 const editing = ref<{ entryId: string; field: EditField; value: string; original: string } | null>(null);
 const editInputRef = ref<HTMLInputElement | null>(null);
 const savingEntryId = ref<string | null>(null);
@@ -959,6 +1046,12 @@ const ALL_COLUMNS: ColumnDef[] = [
   { key: 'nameRaw',         label: 'Tên KH (file)',           defaultVisible: true  },
   { key: 'nameZalo',        label: 'Tên KH (Zalo)',           defaultVisible: true  },
   { key: 'personalNote',    label: '💬 Lời mời riêng',         defaultVisible: true  },
+  // Profile info group
+  { key: 'birthDate',       label: '🎂 Ngày sinh',             defaultVisible: false, group: 'Thông tin cá nhân' },
+  { key: 'gender',          label: '👤 Giới tính',             defaultVisible: false, group: 'Thông tin cá nhân' },
+  { key: 'occupation',      label: '💼 Chức vụ',               defaultVisible: false, group: 'Thông tin cá nhân' },
+  { key: 'unit',            label: '🏢 Đơn vị',                 defaultVisible: false, group: 'Thông tin cá nhân' },
+  { key: 'birthdayWish',    label: '🎉 Lời chúc sinh nhật',      defaultVisible: false, group: 'Thông tin cá nhân' },
   { key: 'lifecycle',       label: '🔄 Trạng thái',            defaultVisible: true  },
   { key: 'zaloUid',         label: 'Zalo UID',                defaultVisible: true  },
   { key: 'resolvedByNick',  label: 'Nick tìm ra',             defaultVisible: true  },
@@ -973,8 +1066,8 @@ const ALL_COLUMNS: ColumnDef[] = [
   { key: 'fbIsOrganic',     label: 'Organic',                 defaultVisible: false, group: 'Facebook Lead' },
   { key: 'fbCustomAnswers', label: 'Trả lời form',            defaultVisible: false, group: 'Facebook Lead' },
 ];
-// v2: bumped to re-initialize user prefs with new FB column defaults
-const COL_STORAGE_KEY = 'zalocrm:listDetail:visibleColumns:v2';
+// v3: bumped to re-initialize user prefs with new Profile Info column defaults
+const COL_STORAGE_KEY = 'zalocrm:listDetail:visibleColumns:v3';
 
 function loadVisibleColumns(): Set<string> {
   try {

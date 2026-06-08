@@ -33,6 +33,8 @@ import { checkPolicy } from '../../../core/runtime-policy.js';
 import { pickNickForTask } from './nick-selector.js';
 import type { SequenceStep } from '../sequences/types.js';
 import type { BlockActionType } from '../blocks/types.js';
+import { normalizeSendMessageTargets } from './send-message-targets.js';
+import { applySendMessageTargetOverrides } from './send-message-trigger-targets.js';
 
 // ── Worker config ─────────────────────────────────────────────────────────
 
@@ -171,6 +173,10 @@ async function processTask(taskId: string): Promise<void> {
 
   const rules = (task.campaign.rulesSnapshot as object) as SequenceRuntimeRules;
   const actionType = task.block.actionType as BlockActionType;
+  const sendMessageSnapshot = (task.blockSnapshot as Record<string, unknown>) ?? {};
+  const explicitSendMessageTargets = actionType === 'send_message'
+    ? normalizeSendMessageTargets(sendMessageSnapshot)
+    : [];
   const now = new Date();
 
   // 3. Hour range
@@ -210,7 +216,14 @@ async function processTask(taskId: string): Promise<void> {
   //      - send_message: must find existing Friend (accepted/pending)
   //      - request_friend: round-robin across connected nicks, dedup attempts, cap-aware
   let assignedNickId = task.assignedNickId;
-  if (!assignedNickId && (actionType === 'request_friend' || actionType === 'send_message')) {
+  if (!assignedNickId && explicitSendMessageTargets.length === 1) {
+    assignedNickId = explicitSendMessageTargets[0].accountId;
+    await prisma.automationTask.update({
+      where: { id: taskId },
+      data: { assignedNickId },
+    });
+  }
+  if (!assignedNickId && explicitSendMessageTargets.length === 0 && (actionType === 'request_friend' || actionType === 'send_message')) {
     const pick = await pickNickForTask({
       orgId: task.orgId,
       contactId: task.contact.id,
@@ -381,8 +394,10 @@ async function rescheduleForRetry(taskId: string, retryAt: Date, detail?: string
 }
 
 async function markDoneAndAdvance(
-  task: { id: string; campaignId: string; sequenceId: string | null; currentStepIdx: number | null;
-          contactId: string; orgId: string; campaign: { sequence: { steps: unknown } | null } },
+  task: {
+    id: string; campaignId: string; sequenceId: string | null; currentStepIdx: number | null;
+    contactId: string; orgId: string; campaign: { sequence: { steps: unknown } | null }
+  },
   outcomeData: object | null,
   nickId: string | null,
   actionType: BlockActionType,
@@ -454,7 +469,7 @@ async function markDoneAndAdvance(
       sequenceId: task.sequenceId,
       currentStepIdx: nextIdx,
       currentBlockId: block.id,
-      blockSnapshot: block.content as object,
+      blockSnapshot: applySendMessageTargetOverrides(block.content, rules) as object,
       scheduledAt,
       state: TASK_STATES.QUEUED,
     },

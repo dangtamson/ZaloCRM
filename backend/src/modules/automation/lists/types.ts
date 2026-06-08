@@ -34,6 +34,11 @@ export interface ParsedLine {
   phoneLocal: string | null;// "0908123456" hoặc null
   nameRaw: string | null;   // tên cắt ra từ dòng (sau số phone)
   personalNote: string | null; // lời mời / tin nhắn riêng — chỉ có cho CSV/Excel mapping
+  birthDate: Date | null;
+  gender: string | null;
+  occupation: string | null;
+  unit: string | null;
+  birthdayWish: string | null;
   valid: boolean;
   invalidReason: InvalidReason | null;
 }
@@ -46,6 +51,11 @@ export interface MappedRow {
   phone: string;          // raw cell value, có thể có prefix "p:" hoặc khoảng trắng
   name?: string | null;
   personalNote?: string | null;
+  birthDate?: string | null;
+  gender?: string | null;
+  occupation?: string | null;
+  unit?: string | null;
+  birthdayWish?: string | null;
 }
 
 export interface ImportResult {

@@ -161,6 +161,10 @@
               class="at-input"
               placeholder="CustomerList ID"
             />
+            <label v-if="segmentKind === 'customer-list'" class="form-toggle">
+              <input type="checkbox" v-model="customerListBirthdayThisWeek" />
+              <span>Chỉ lấy người có sinh nhật trong tuần hiện tại</span>
+            </label>
             <p v-if="segmentKind === 'filter'" class="at-caption form-hint">
               Mặc định filter "hasZalo=true + acceptedNicksCount > 0" (chỉ KH có thể nhận tin).
             </p>
@@ -254,6 +258,7 @@ const draft = ref<Draft | null>(null);
 const segmentKind = ref<'manual' | 'filter' | 'customer-list'>('filter');
 const manualContactIdsText = ref('');
 const customerListId = ref('');
+const customerListBirthdayThisWeek = ref(false);
 const pacing = ref({
   maxPerNickPerHour: 50,
   allowedHourRangeStart: 6,
@@ -333,6 +338,7 @@ function openCreate() {
   segmentKind.value = 'filter';
   manualContactIdsText.value = '';
   customerListId.value = '';
+  customerListBirthdayThisWeek.value = false;
   pacing.value = { maxPerNickPerHour: 50, allowedHourRangeStart: 6, allowedHourRangeEnd: 22 };
   error.value = '';
   editorOpen.value = true;
@@ -349,7 +355,12 @@ function openEdit(bc: Broadcast) {
   };
   segmentKind.value = (bc.segmentSpec.kind as 'manual' | 'filter' | 'customer-list') ?? 'filter';
   if (bc.segmentSpec.kind === 'manual') manualContactIdsText.value = bc.segmentSpec.contactIds.join('\n');
-  if (bc.segmentSpec.kind === 'customer-list') customerListId.value = bc.segmentSpec.listId;
+  if (bc.segmentSpec.kind === 'customer-list') {
+    customerListId.value = bc.segmentSpec.listId;
+    customerListBirthdayThisWeek.value = bc.segmentSpec.birthdayThisWeek === true;
+  } else {
+    customerListBirthdayThisWeek.value = false;
+  }
   pacing.value = {
     maxPerNickPerHour: bc.pacing.maxPerNickPerHour ?? 50,
     allowedHourRangeStart: bc.pacing.allowedHourRange?.[0] ?? 6,
@@ -367,7 +378,11 @@ function buildSegmentSpec(): SegmentSpec | null {
   }
   if (segmentKind.value === 'customer-list') {
     if (!customerListId.value.trim()) { error.value = 'Cần listId'; return null; }
-    return { kind: 'customer-list', listId: customerListId.value.trim() };
+    return {
+      kind: 'customer-list',
+      listId: customerListId.value.trim(),
+      ...(customerListBirthdayThisWeek.value ? { birthdayThisWeek: true } : {}),
+    };
   }
   // filter — default: friendable contacts only
   return { kind: 'filter', criteria: { acceptedNicksCount: { gt: 0 } } };

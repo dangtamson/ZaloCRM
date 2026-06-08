@@ -43,6 +43,11 @@ export interface MappedRow {
   phone: string;
   name?: string | null;
   personalNote?: string | null;
+  birthDate?: string | null;
+  gender?: string | null;
+  occupation?: string | null;
+  unit?: string | null;
+  birthdayWish?: string | null;
 }
 
 export type SystemMessageType =
@@ -74,6 +79,11 @@ export interface CustomerListEntry {
   phoneRaw: string;
   nameRaw: string | null;
   personalNote: string | null;
+  birthDate: string | null;
+  gender: string | null;
+  occupation: string | null;
+  unit: string | null;
+  birthdayWish: string | null;
   systemMessages: SystemMessage[];
   phoneE164: string | null;
   phoneLocal: string | null;
@@ -112,6 +122,11 @@ export interface CustomerListEntry {
   createdAt: string;
   updatedAt: string;
 }
+
+export type CustomerListEntryPatch = Partial<Pick<
+  CustomerListEntry,
+  'phoneRaw' | 'nameRaw' | 'personalNote' | 'birthDate' | 'gender' | 'occupation' | 'unit' | 'birthdayWish'
+>>;
 
 export interface DryRunResult {
   total: number;
@@ -304,7 +319,7 @@ export function useCustomerLists() {
   async function updateEntry(
     listId: string,
     entryId: string,
-    patch: { phoneRaw?: string; nameRaw?: string | null; personalNote?: string | null },
+    patch: CustomerListEntryPatch,
   ): Promise<{ entry: CustomerListEntry; conflictWarn: boolean; dupWithListName: string | null } | null> {
     try {
       const res = await api.patch(`/customer-lists/${listId}/entries/${entryId}`, patch);

@@ -89,6 +89,86 @@
           </div>
           <v-btn variant="text" size="small" prepend-icon="mdi-plus" @click="attachments.push({ kind: 'image', url: '', caption: '' })">Thêm đính kèm</v-btn>
 
+          <v-divider class="my-4" />
+          <div class="d-flex align-center mb-2">
+            <v-icon class="mr-2" color="teal">mdi-card-account-details-outline</v-icon>
+            <span class="text-subtitle-2">Template Ảnh</span>
+            <v-spacer />
+            <v-switch v-model="htmlImageEnabled" color="teal" base-color="grey-lighten-1" density="compact" hide-details inset class="automation-toggle automation-toggle--teal" />
+          </div>
+          <template v-if="htmlImageEnabled">
+            <div class="html-template-controls mb-2">
+              <v-select
+                v-model="htmlTemplatePreset"
+                :items="htmlTemplatePresetItems"
+                item-title="label"
+                item-value="value"
+                label="Mẫu template"
+                variant="outlined"
+                density="compact"
+                clearable
+                hide-details
+                class="html-template-controls__select"
+              />
+              <div class="html-template-controls__actions">
+                <v-btn
+                  variant="tonal"
+                  color="teal"
+                  prepend-icon="mdi-eye-outline"
+                  @click="htmlPreviewEnabled = !htmlPreviewEnabled"
+                >
+                  {{ htmlPreviewEnabled ? 'Ẩn preview' : 'View trước' }}
+                </v-btn>
+                <v-btn
+                  variant="text"
+                  color="teal"
+                  :prepend-icon="htmlTemplateEditorExpanded ? 'mdi-chevron-up' : 'mdi-code-tags'"
+                  @click="htmlTemplateEditorExpanded = !htmlTemplateEditorExpanded"
+                >
+                  {{ htmlTemplateEditorExpanded ? 'Ẩn SVG' : 'Mở SVG' }}
+                </v-btn>
+              </div>
+            </div>
+            <div class="html-template-editor-summary mb-2">
+              <span>SVG template</span>
+              <span>{{ htmlTemplate.length.toLocaleString('vi-VN') }} ký tự</span>
+            </div>
+            <v-expand-transition>
+              <div v-if="htmlTemplateEditorExpanded">
+                <v-textarea
+                  v-model="htmlTemplate"
+                  label="SVG template"
+                  variant="outlined"
+                  rows="6"
+                  auto-grow
+                  hint="Bắt đầu bằng <svg>. Biến hỗ trợ: {{contact.salutation}}, {{contact.fullName}}, {{contact.birthDate}}, {{contact.occupation}}, {{contact.unit}}, {{contact.birthdayWish}}, {{contact.birthdayWishLine1}}...{{contact.birthdayWishLine5}}, {{org.name}}"
+                  persistent-hint
+                  class="mb-2"
+                />
+                <div class="d-flex gap-2">
+                  <v-text-field v-model.number="htmlWidth" type="number" min="640" max="2000" label="Width" variant="outlined" density="compact" style="max-width: 140px" />
+                  <v-text-field v-model.number="htmlHeight" type="number" min="640" max="3000" label="Height" variant="outlined" density="compact" style="max-width: 140px" />
+                </div>
+                <v-checkbox v-model="htmlFailOpen" label="Lỗi render ảnh vẫn gửi text (failOpen)" density="compact" hide-details class="mt-1" />
+              </div>
+            </v-expand-transition>
+            <div v-if="htmlPreviewEnabled" class="html-template-preview mt-3">
+              <div class="html-template-preview__bar">
+                <span>Preview mẫu với dữ liệu test</span>
+                <span>{{ htmlWidth }} x {{ htmlHeight }}</span>
+              </div>
+              <div v-if="htmlPreviewSrcdoc" class="html-template-preview__stage">
+                <iframe
+                  class="html-template-preview__frame"
+                  title="HTML template preview"
+                  sandbox=""
+                  :srcdoc="htmlPreviewSrcdoc"
+                />
+              </div>
+              <div v-else class="html-template-preview__empty">Chưa có SVG để preview</div>
+            </div>
+          </template>
+
           <!-- AI image generation: per-send, prepended to outgoing attachments -->
           <v-divider class="my-4" />
           <div class="d-flex align-center mb-2">
@@ -98,9 +178,11 @@
             <v-switch
               v-model="aiImageEnabled"
               color="purple"
+              base-color="grey-lighten-1"
               density="compact"
               hide-details
               inset
+              class="automation-toggle automation-toggle--purple"
             />
           </div>
           <div class="text-caption text-medium-emphasis mb-2">
@@ -224,6 +306,56 @@ const draft = ref<Draft>({ name: '', actionType: 'send_message', folderId: null 
 const greetingVariants = ref<string[]>(['']);
 const textVariants = ref<string[]>(['']);
 const attachments = ref<Array<{ kind: string; url: string; caption: string }>>([]);
+const htmlImageEnabled = ref(false);
+const htmlTemplate = ref('');
+const htmlWidth = ref(768);
+const htmlHeight = ref(1152);
+const htmlFailOpen = ref(true);
+const htmlTemplatePreset = ref('');
+const htmlPreviewEnabled = ref(false);
+const htmlTemplateEditorExpanded = ref(false);
+const BIRTHDAY_CARD_BACKGROUND_HREF = '/automation-assets/image/hpbd.png';
+const BIRTHDAY_VNPT_SVG_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1280" viewBox="0 0 960 1280">
+  <defs>
+    <style>
+      .serif { font-family: 'Times New Roman', Georgia, serif; }
+      .script { font-family: 'Brush Script MT', 'Segoe Script', cursive; font-style: italic; }
+      .name { fill: #8a5b14; font-size: 64px; }
+      .unit { fill: #ffffff; font-size: 25px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+      .dob { fill: #06184a; font-size: 43px; font-weight: 700; letter-spacing: 8px; }
+      .message { fill: #0b1f5f; font-size: 25px; font-style: italic; }
+    </style>
+  </defs>
+  <image href="${BIRTHDAY_CARD_BACKGROUND_HREF}" x="0" y="0" width="960" height="1280" preserveAspectRatio="none"/>
+
+  <rect x="145" y="270" width="640" height="99" rx="18" fill="#f6e9de" opacity="0"/>
+  <rect x="300" y="380" width="380" height="40" fill="#06184f" opacity="0"/>
+  <rect x="420" y="510" width="260" height="45" fill="#f6e9de" opacity="0"/>
+  <rect x="286" y="594" width="530" height="150" fill="#f6e9de" opacity="0"/>
+
+  <text x="465" y="326" text-anchor="middle" class="script name">{{contact.salutation}} {{contact.fullName}}</text>
+  <text x="487" y="402" text-anchor="middle" class="serif unit">{{contact.occupation}} - {{contact.unit}}</text>
+  <text x="540" y="542" text-anchor="middle" class="serif dob">{{contact.birthDate}}</text>
+  <text x="557" y="625" text-anchor="middle" class="serif message">
+    <tspan x="557" dy="0">{{contact.birthdayWishLine1}}</tspan>
+    <tspan x="557" dy="38">{{contact.birthdayWishLine2}}</tspan>
+    <tspan x="557" dy="38">{{contact.birthdayWishLine3}}</tspan>
+    <tspan x="557" dy="38">{{contact.birthdayWishLine4}}</tspan>
+    <tspan x="557" dy="38">{{contact.birthdayWishLine5}}</tspan>
+  </text>
+</svg>`;
+const HTML_TEMPLATE_PRESETS = [
+  {
+    value: 'vnpt_birthday_blue_gold',
+    label: 'Sinh nhật VNPT Mẫu 1',
+    width: 960,
+    height: 1280,
+    html: BIRTHDAY_VNPT_SVG_TEMPLATE,
+  },
+] as const;
+const DEFAULT_HTML_TEMPLATE_PRESET = 'vnpt_birthday_blue_gold';
+const htmlTemplatePresetItems = HTML_TEMPLATE_PRESETS.map(({ value, label }) => ({ value, label }));
+const htmlPreviewSrcdoc = computed(() => renderTemplatePreview(htmlTemplate.value));
 // AI image generation (send_message only) — fully optional. The toggle below
 // drives whether `aiImagePrompt` is serialized into block.content on save.
 const aiImageEnabled = ref(false);
@@ -262,6 +394,26 @@ watch(() => props.modelValue, (open) => {
     attachments.value = Array.isArray(c.attachments)
       ? (c.attachments as Array<{ kind: string; url: string; caption?: string }>).map((a) => ({ kind: a.kind, url: a.url, caption: a.caption ?? '' }))
       : [];
+    const htmlCfg = c.htmlImageTemplate as { html?: string; width?: number; height?: number; failOpen?: boolean } | undefined;
+    if (htmlCfg?.html) {
+      htmlImageEnabled.value = true;
+      htmlTemplate.value = htmlCfg.html;
+      htmlWidth.value = htmlCfg.width ?? 768;
+      htmlHeight.value = htmlCfg.height ?? 1152;
+      htmlFailOpen.value = htmlCfg.failOpen !== false;
+      htmlTemplatePreset.value = findHtmlTemplatePresetValue(htmlCfg.html) ?? '';
+      htmlPreviewEnabled.value = false;
+      htmlTemplateEditorExpanded.value = false;
+    } else {
+      htmlImageEnabled.value = false;
+      htmlTemplate.value = '';
+      htmlWidth.value = 768;
+      htmlHeight.value = 1152;
+      htmlFailOpen.value = true;
+      htmlTemplatePreset.value = '';
+      htmlPreviewEnabled.value = false;
+      htmlTemplateEditorExpanded.value = false;
+    }
     const aiCfg = c.aiImagePrompt as AiImagePrompt | undefined;
     if (aiCfg && typeof aiCfg === 'object' && aiCfg.prompt) {
       aiImageEnabled.value = true;
@@ -283,12 +435,114 @@ watch(() => props.modelValue, (open) => {
     greetingVariants.value = [''];
     textVariants.value = [''];
     attachments.value = [];
+    htmlImageEnabled.value = true;
+    htmlTemplatePreset.value = DEFAULT_HTML_TEMPLATE_PRESET;
+    applyHtmlTemplatePreset(DEFAULT_HTML_TEMPLATE_PRESET);
+    htmlTemplateEditorExpanded.value = false;
     aiImageEnabled.value = false;
     aiImagePrompt.value = { prompt: '', provider: '', model: '', size: '1024x1024', failOpen: true };
     statusId.value = '';
     onlyFromStatusIds.value = [];
   }
 });
+
+watch(htmlTemplatePreset, (value) => {
+  if (!value) return;
+  applyHtmlTemplatePreset(value);
+});
+
+watch([htmlTemplate, htmlWidth, htmlHeight], () => {
+  const preset = HTML_TEMPLATE_PRESETS.find((item) => item.value === htmlTemplatePreset.value);
+  if (!preset) return;
+  const templateMatches = normalizeTemplateSource(htmlTemplate.value) === normalizeTemplateSource(preset.html);
+  const sizeMatches = Number(htmlWidth.value) === preset.width && Number(htmlHeight.value) === preset.height;
+  if (!templateMatches || !sizeMatches) {
+    htmlTemplatePreset.value = '';
+  }
+});
+
+function applyHtmlTemplatePreset(value: string) {
+  const preset = HTML_TEMPLATE_PRESETS.find((item) => item.value === value);
+  if (!preset) return;
+  htmlTemplate.value = preset.html;
+  htmlWidth.value = preset.width;
+  htmlHeight.value = preset.height;
+  htmlFailOpen.value = true;
+  htmlPreviewEnabled.value = true;
+  htmlTemplateEditorExpanded.value = false;
+}
+
+function findHtmlTemplatePresetValue(html: string) {
+  const normalized = normalizeTemplateSource(html);
+  return HTML_TEMPLATE_PRESETS.find((item) => normalizeTemplateSource(item.html) === normalized)?.value ?? null;
+}
+
+function normalizeTemplateSource(html: string) {
+  return html.trim().replace(/\s+/g, ' ');
+}
+
+function renderTemplatePreview(template: string) {
+  if (!template.trim()) return '';
+  const replacements: Record<string, string> = {
+    'contact.salutation': 'Anh',
+    'contact.fullName': 'Nguyễn Văn A',
+    'contact.crmName': 'Anh Nguyễn Văn A',
+    'contact.birthDate': '01/01/1900',
+    'contact.gender': 'Nam',
+    'contact.occupation': 'N/A',
+    'contact.unit': 'VNPT CẦN THƠ',
+    'contact.birthdayWish': 'Nhân dịp sinh nhật của {{contact.salutation}}, kính chúc {{contact.salutation}} luôn dồi dào sức khỏe, hạnh phúc, thành công.',
+    'contact.birthdayWishLine1': 'Nhân dịp sinh nhật của {{contact.salutation}}, kính chúc {{contact.salutation}} luôn',
+    'contact.birthdayWishLine2': 'dồi dào sức khỏe, hạnh phúc, thành công và tiếp tục',
+    'contact.birthdayWishLine3': 'đồng hành với VNPT CẦN THƠ phát triển vững mạnh,',
+    'contact.birthdayWishLine4': 'hoàn thành xuất sắc mọi nhiệm vụ, đóng góp tích cực',
+    'contact.birthdayWishLine5': 'vào sự phát triển chung của VNPT.',
+    'org.name': 'VNPT CẦN THƠ',
+    'date.today': '01/01/1900',
+  };
+  const rendered = normalizePreviewAssetUrls(
+    template.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_match, key: string) => replacements[key.trim()] ?? ''),
+  );
+  return `<!doctype html>
+<html>
+<head>
+  <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #f6f7f9;
+    }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    svg {
+      display: block;
+      width: auto;
+      height: auto;
+      max-width: 100%;
+      max-height: 100%;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+      background: white;
+    }
+  </style>
+</head>
+<body>${rendered}</body>
+</html>`;
+}
+
+function normalizePreviewAssetUrls(markup: string) {
+  if (typeof window === 'undefined') return markup;
+  return markup.replace(
+    /(href|xlink:href)=["']\/automation-assets\//g,
+    `$1="${window.location.origin}/automation-assets/`,
+  );
+}
 
 function updateGreeting(idx: number, val: string) { greetingVariants.value[idx] = val; }
 function addGreeting() { greetingVariants.value.push(''); }
@@ -311,6 +565,14 @@ function buildContent(): Record<string, unknown> {
           url: a.url,
           ...(a.caption ? { caption: a.caption } : {}),
         }));
+      }
+      if (htmlImageEnabled.value && htmlTemplate.value.trim()) {
+        out.htmlImageTemplate = {
+          html: htmlTemplate.value.trim(),
+          width: Math.max(640, Math.min(2000, Number(htmlWidth.value) || 768)),
+          height: Math.max(640, Math.min(3000, Number(htmlHeight.value) || 1152)),
+          failOpen: htmlFailOpen.value,
+        };
       }
       // Only persist aiImagePrompt when the operator explicitly enabled it AND
       // provided a non-empty prompt. Backend validator rejects empty prompts.
@@ -366,3 +628,175 @@ async function onSave() {
   }
 }
 </script>
+
+<style scoped>
+.automation-toggle {
+  flex: 0 0 auto;
+}
+
+.automation-toggle :deep(.v-switch__track) {
+  opacity: 1 !important;
+}
+
+.automation-toggle:not(.v-selection-control--dirty) :deep(.v-switch__track) {
+  background-color: #e5e7eb !important;
+  border: 1px solid #cbd5e1;
+}
+
+.automation-toggle:not(.v-selection-control--dirty) :deep(.v-switch__thumb) {
+  background-color: #ffffff !important;
+  color: #64748b !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.18);
+}
+
+.automation-toggle.v-selection-control--dirty :deep(.v-switch__track),
+.automation-toggle :deep(.v-selection-control--dirty .v-switch__track) {
+  opacity: 1 !important;
+  border-color: transparent;
+}
+
+.automation-toggle.v-selection-control--dirty :deep(.v-switch__thumb),
+.automation-toggle :deep(.v-selection-control--dirty .v-switch__thumb) {
+  background-color: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.24);
+}
+
+.automation-toggle--indigo.v-selection-control--dirty :deep(.v-switch__track),
+.automation-toggle--indigo :deep(.v-selection-control--dirty .v-switch__track) {
+  background-color: #4f46e5 !important;
+}
+
+.automation-toggle--blue.v-selection-control--dirty :deep(.v-switch__track),
+.automation-toggle--blue :deep(.v-selection-control--dirty .v-switch__track) {
+  background-color: #2563eb !important;
+}
+
+.automation-toggle--teal.v-selection-control--dirty :deep(.v-switch__track),
+.automation-toggle--teal :deep(.v-selection-control--dirty .v-switch__track) {
+  background-color: #0f766e !important;
+}
+
+.automation-toggle--purple.v-selection-control--dirty :deep(.v-switch__track),
+.automation-toggle--purple :deep(.v-selection-control--dirty .v-switch__track) {
+  background-color: #7e22ce !important;
+}
+
+.send-target-row {
+  display: grid;
+  grid-template-columns: minmax(200px, 240px) minmax(260px, 1fr) 36px;
+  align-items: start;
+  gap: 12px;
+}
+
+.send-target-row__account,
+.send-target-row__recipient {
+  min-width: 0;
+}
+
+.send-target-row__remove {
+  margin-top: 2px;
+  justify-self: end;
+}
+
+.html-template-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.html-template-controls__select {
+  flex: 1 1 320px;
+  min-width: 220px;
+}
+
+.html-template-controls__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.html-template-editor-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px dashed rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 8px;
+  color: rgba(var(--v-theme-on-surface), 0.68);
+  font-size: 12px;
+}
+
+.html-template-preview {
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgb(var(--v-theme-surface));
+}
+
+.html-template-preview__bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  color: rgba(var(--v-theme-on-surface), 0.72);
+  font-size: 12px;
+  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+.html-template-preview__stage {
+  width: 100%;
+  height: min(58vh, 430px);
+  min-height: 300px;
+  padding: 10px;
+  background: #f6f7f9;
+  box-sizing: border-box;
+}
+
+.html-template-preview__frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+}
+
+.html-template-preview__empty {
+  padding: 32px 12px;
+  color: rgba(var(--v-theme-on-surface), 0.62);
+  text-align: center;
+  font-size: 13px;
+}
+
+@media (max-width: 720px) {
+  .send-target-row {
+    grid-template-columns: 1fr 36px;
+    gap: 8px;
+  }
+
+  .send-target-row__account,
+  .send-target-row__recipient {
+    grid-column: 1 / 2;
+  }
+
+  .send-target-row__remove {
+    grid-column: 2 / 3;
+    grid-row: 1 / 2;
+  }
+
+  .html-template-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .html-template-controls__select {
+    flex-basis: auto;
+    min-width: 0;
+  }
+
+  .html-template-controls__actions {
+    justify-content: flex-start;
+  }
+}
+</style>

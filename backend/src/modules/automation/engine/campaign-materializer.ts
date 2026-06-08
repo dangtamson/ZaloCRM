@@ -19,6 +19,245 @@ import { logger } from '../../../shared/utils/logger.js';
 import { DEFAULT_RUNTIME_RULES, type SequenceStep } from '../sequences/types.js';
 import type { AutomationEvent } from './types.js';
 import { sanitizeContactCriteria, sanitizeManualContactIds } from './segment-sanitizer.js';
+import { applySendMessageTargetOverrides } from './send-message-trigger-targets.js';
+
+const VN_TIMEZONE = 'Asia/Ho_Chi_Minh';
+
+interface CustomerListEntryProfile {
+  nameRaw: string | null;
+  birthDate: Date | null;
+  gender: string | null;
+  occupation: string | null;
+  unit: string | null;
+  birthdayWish: string | null;
+}
+
+interface TemplateContactOverride {
+  fullName?: string;
+  crmName?: string;
+  birthDate?: string;
+  gender?: string;
+  occupation?: string;
+  unit?: string;
+  birthdayWish?: string;
+}
+
+interface SegmentResolution {
+  contactIds: string[];
+  templateProfileByContactId: Map<string, TemplateContactOverride>;
+  templateProfiles: TemplateContactOverride[];
+}
+
+function getVnNow(): Date {
+  return new Date(new Date().toLocaleString('en-US', { timeZone: VN_TIMEZONE }));
+}
+
+function toMonthDayKey(date: Date): number {
+  return (date.getMonth() + 1) * 100 + date.getDate();
+}
+
+function getBirthdayWeekMonthDayKeys(now: Date): Set<number> {
+  // Monday to Sunday week window in VN time.
+  const current = new Date(now);
+  const day = current.getDay(); // 0 Sun ... 6 Sat
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const monday = new Date(current);
+  monday.setDate(current.getDate() + diffToMonday);
+  const keys = new Set<number>();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    keys.add(toMonthDayKey(d));
+  }
+  return keys;
+}
+
+function emptySegmentResolution(contactIds: string[] = []): SegmentResolution {
+  return { contactIds, templateProfileByContactId: new Map(), templateProfiles: [] };
+}
+
+function toTemplateContactOverride(profile: CustomerListEntryProfile): TemplateContactOverride {
+  const override: TemplateContactOverride = {};
+  if (profile.nameRaw?.trim()) {
+    override.fullName = profile.nameRaw.trim();
+    override.crmName = profile.nameRaw.trim();
+  }
+  if (profile.birthDate) override.birthDate = profile.birthDate.toISOString();
+  if (profile.gender?.trim()) override.gender = profile.gender.trim();
+  if (profile.occupation?.trim()) override.occupation = profile.occupation.trim();
+  if (profile.unit?.trim()) override.unit = profile.unit.trim();
+  if (profile.birthdayWish?.trim()) override.birthdayWish = profile.birthdayWish.trim();
+  return override;
+}
+
+function buildTaskBlockSnapshot(
+  content: unknown,
+  templateProfile?: TemplateContactOverride,
+  templateProfiles?: TemplateContactOverride[],
+  ruleOverrides?: unknown,
+): object {
+  const snapshot = applySendMessageTargetOverrides(content, ruleOverrides);
+  const nonEmptyProfiles = Array.isArray(templateProfiles)
+    ? templateProfiles.filter((profile) => Object.keys(profile).length > 0)
+    : [];
+  if (nonEmptyProfiles.length > 1) {
+    snapshot.__templateContactOverrides = nonEmptyProfiles;
+  } else if (templateProfile && Object.keys(templateProfile).length > 0) {
+    snapshot.__templateContactOverride = templateProfile;
+  }
+  return snapshot;
+}
+
+function hasHtmlImageTemplate(content: unknown): boolean {
+  if (!content || typeof content !== 'object' || Array.isArray(content)) return false;
+  const template = (content as Record<string, unknown>).htmlImageTemplate;
+  return Boolean(template && typeof template === 'object' && !Array.isArray(template));
+}
+
+function getTemplateProfilesForContactIds(
+  contactIds: string[],
+  profileByContactId: Map<string, TemplateContactOverride>,
+): TemplateContactOverride[] {
+  return contactIds
+    .map((contactId) => profileByContactId.get(contactId))
+    .filter((profile): profile is TemplateContactOverride => Boolean(profile));
+}
+
+function getPayloadTriggerId(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return undefined;
+  const triggerId = (payload as Record<string, unknown>).triggerId;
+  return typeof triggerId === 'string' && triggerId.trim() ? triggerId.trim() : undefined;
+}
+
+async function resolveCustomerListContacts(
+  orgId: string,
+  listId: string,
+  birthdayThisWeek: boolean,
+): Promise<SegmentResolution> {
+  const entries = await prisma.customerListEntry.findMany({
+    where: {
+      customerListId: listId,
+      status: { in: ['enriched', 'validated'] },
+      phoneValid: true,
+      ...(birthdayThisWeek ? { birthDate: { not: null } } : {}),
+    },
+    select: {
+      phoneE164: true,
+      contactId: true,
+      dupWithContactId: true,
+      nameRaw: true,
+      birthDate: true,
+      gender: true,
+      occupation: true,
+      unit: true,
+      birthdayWish: true,
+    } as never,
+    take: 50000,
+  }) as Array<{
+    phoneE164: string | null;
+    contactId: string | null;
+    dupWithContactId: string | null;
+    nameRaw: string | null;
+    birthDate: Date | null;
+    gender: string | null;
+    occupation: string | null;
+    unit: string | null;
+    birthdayWish: string | null;
+  }>;
+
+  const weekKeys = birthdayThisWeek ? getBirthdayWeekMonthDayKeys(getVnNow()) : null;
+  const inBirthdayWeek = (birthDate: Date | null): boolean => {
+    if (!weekKeys) return true;
+    if (!birthDate) return false;
+    return weekKeys.has(toMonthDayKey(new Date(birthDate)));
+  };
+
+  const linkedContactIds = entries
+    .filter((e) => inBirthdayWeek(e.birthDate))
+    .flatMap((e) => [e.contactId, e.dupWithContactId])
+    .filter((id): id is string => Boolean(id));
+  const eligibleProfiles = entries
+    .filter((e) => inBirthdayWeek(e.birthDate))
+    .map((e) => toTemplateContactOverride({
+      nameRaw: e.nameRaw,
+      birthDate: e.birthDate,
+      gender: e.gender,
+      occupation: e.occupation,
+      unit: e.unit,
+      birthdayWish: e.birthdayWish,
+    }))
+    .filter((profile) => Object.keys(profile).length > 0);
+
+  const phones84 = entries
+    .filter((e) => !e.contactId && !e.dupWithContactId && e.phoneE164 && inBirthdayWeek(e.birthDate))
+    .map((e) => e.phoneE164!.replace(/^\+/, ''));
+
+  const allIds = new Set<string>(linkedContactIds);
+  const linkedProfileByContactId = new Map<string, CustomerListEntryProfile>();
+  for (const e of entries) {
+    if (!inBirthdayWeek(e.birthDate)) continue;
+    for (const id of [e.contactId, e.dupWithContactId]) {
+      if (!id || linkedProfileByContactId.has(id)) continue;
+      linkedProfileByContactId.set(id, {
+        nameRaw: e.nameRaw,
+        birthDate: e.birthDate,
+        gender: e.gender,
+        occupation: e.occupation,
+        unit: e.unit,
+        birthdayWish: e.birthdayWish,
+      });
+    }
+  }
+  if (phones84.length > 0) {
+    const matched = await prisma.contact.findMany({
+      where: { orgId, phoneNormalized: { in: phones84 } },
+      select: { id: true, phoneNormalized: true },
+      take: 50000,
+    });
+    const profileByPhone = new Map<string, CustomerListEntryProfile>();
+    for (const e of entries) {
+      if (!e.phoneE164 || !inBirthdayWeek(e.birthDate)) continue;
+      const key = e.phoneE164.replace(/^\+/, '');
+      if (!profileByPhone.has(key)) {
+        profileByPhone.set(key, {
+          nameRaw: e.nameRaw,
+          birthDate: e.birthDate,
+          gender: e.gender,
+          occupation: e.occupation,
+          unit: e.unit,
+          birthdayWish: e.birthdayWish,
+        });
+      }
+    }
+    for (const c of matched) {
+      allIds.add(c.id);
+      const profile = c.phoneNormalized ? profileByPhone.get(c.phoneNormalized) : null;
+      if (profile && !linkedProfileByContactId.has(c.id)) {
+        linkedProfileByContactId.set(c.id, profile);
+      }
+    }
+  }
+
+  return {
+    contactIds: Array.from(allIds),
+    templateProfileByContactId: new Map(
+      Array.from(linkedProfileByContactId.entries()).map(([contactId, profile]) => [
+        contactId,
+        toTemplateContactOverride(profile),
+      ]),
+    ),
+    templateProfiles: eligibleProfiles,
+  };
+}
+
+async function findTaskAnchorContactId(orgId: string): Promise<string | null> {
+  const sample = await prisma.contact.findFirst({
+    where: { orgId, mergedInto: null },
+    select: { id: true },
+    orderBy: { createdAt: 'asc' },
+  });
+  return sample?.id ?? null;
+}
 
 export interface MaterializeResult {
   campaignsCreated: number;
@@ -50,32 +289,32 @@ function matchesEventFilter(
 // segmentSpec evaluation. Phase 7 supports 'manual' (contactIds list) and
 // 'filter' (Prisma where clause subset). 'import-batch' requires the import
 // phase to ship a ContactImportBatch table — soft-checked here.
-async function resolveSegmentContactIds(
+async function resolveSegmentContacts(
   orgId: string,
   spec: unknown,
   hintContactId: string | null,
-): Promise<string[]> {
-  if (hintContactId) return [hintContactId]; // event already names the contact
+): Promise<SegmentResolution> {
+  if (hintContactId) return emptySegmentResolution([hintContactId]); // event already names the contact
 
-  if (!spec || typeof spec !== 'object') return [];
+  if (!spec || typeof spec !== 'object') return emptySegmentResolution();
   const s = spec as Record<string, unknown>;
 
   if (s.kind === 'manual' && Array.isArray(s.contactIds)) {
     // SECURITY FIX (A1): validate ids belong to this org before returning.
     const safeIds = sanitizeManualContactIds(s.contactIds);
-    if (safeIds.length === 0) return [];
+    if (safeIds.length === 0) return emptySegmentResolution();
     const verified = await prisma.contact.findMany({
       where: { id: { in: safeIds }, orgId },
       select: { id: true },
     });
-    return verified.map((c) => c.id);
+    return emptySegmentResolution(verified.map((c) => c.id));
   }
 
   if (s.kind === 'filter' && typeof s.criteria === 'object' && s.criteria !== null) {
     // SECURITY FIX (A1): force orgId AND-scope, strip non-whitelisted fields.
     // Previously `{ orgId, ...criteria }` allowed criteria.orgId override → cross-tenant leak.
     const result = sanitizeContactCriteria(orgId, s.criteria);
-    if (!result.ok || !result.where) return [];
+    if (!result.ok || !result.where) return emptySegmentResolution();
     if (result.rejected?.length) {
       logger.warn(`[materializer] segmentSpec criteria rejected fields: ${result.rejected.join(', ')}`);
     }
@@ -84,21 +323,32 @@ async function resolveSegmentContactIds(
       select: { id: true },
       take: 10000,
     });
-    return rows.map((r) => r.id);
+    return emptySegmentResolution(rows.map((r) => r.id));
+  }
+
+  if (s.kind === 'customer-list' && typeof s.listId === 'string') {
+    const birthdayThisWeek = s.birthdayThisWeek === true;
+    return resolveCustomerListContacts(orgId, s.listId, birthdayThisWeek);
   }
 
   // import-batch: soft reference (table ships later) — skip silently for now
-  return [];
+  return emptySegmentResolution();
 }
 
 export async function materializeFromEvent(
   event: AutomationEvent,
 ): Promise<MaterializeResult> {
   const result: MaterializeResult = { campaignsCreated: 0, tasksEnqueued: 0, skipped: 0, reasons: [] };
+  const payloadTriggerId = getPayloadTriggerId(event.payload);
 
   // Find enabled triggers matching eventType in this org
   const triggers = await prisma.automationTrigger.findMany({
-    where: { orgId: event.orgId, eventType: event.type, enabled: true },
+    where: {
+      orgId: event.orgId,
+      eventType: event.type,
+      enabled: true,
+      ...(payloadTriggerId ? { id: payloadTriggerId } : {}),
+    },
     include: {
       sequence: { select: { id: true, enabled: true, steps: true, runtimeRules: true } },
     },
@@ -142,11 +392,16 @@ export async function materializeFromEvent(
         continue;
       }
 
-      const contactIds = await resolveSegmentContactIds(
+      const segmentResolution = await resolveSegmentContacts(
         event.orgId,
         trigger.segmentSpec ?? event.segmentHint,
         event.contactId ?? null,
       );
+      const contactIds = [...segmentResolution.contactIds];
+      if (contactIds.length === 0 && hasHtmlImageTemplate(block.content) && segmentResolution.templateProfiles.length > 0) {
+        const anchorContactId = await findTaskAnchorContactId(event.orgId);
+        if (anchorContactId) contactIds.push(anchorContactId);
+      }
       if (contactIds.length === 0) {
         result.skipped++;
         result.reasons.push(`trigger ${trigger.id}: no contacts resolved (block-bound)`);
@@ -189,6 +444,46 @@ export async function materializeFromEvent(
       const jitterMin = (rulesSnapshot.randomDelayPerSend?.min ?? 0) * 60 * 1000;
       const jitterMax = (rulesSnapshot.randomDelayPerSend?.max ?? 0) * 60 * 1000;
       const baseNow = Date.now();
+      const groupedTemplateProfiles = segmentResolution.templateProfiles.length > 0
+        ? segmentResolution.templateProfiles
+        : getTemplateProfilesForContactIds(
+          contactIds,
+          segmentResolution.templateProfileByContactId,
+        );
+
+      if (hasHtmlImageTemplate(block.content) && groupedTemplateProfiles.length > 0) {
+        const groupedContactId = contactIds[0];
+        const existing = await prisma.automationTask.findFirst({
+          where: { campaignId: blockCampaign.id, contactId: groupedContactId },
+          select: { id: true },
+        });
+        if (existing) {
+          result.skipped++;
+          result.reasons.push(`contact ${groupedContactId}: already in block campaign ${blockCampaign.id}`);
+          continue;
+        }
+        const jitter = jitterMin + Math.random() * Math.max(0, jitterMax - jitterMin);
+        const scheduledAt = new Date(baseNow + jitter);
+        await prisma.automationTask.create({
+          data: {
+            id: randomUUID(),
+            orgId: event.orgId,
+            campaignId: blockCampaign.id,
+            contactId: groupedContactId,
+            currentBlockId: block.id,
+            blockSnapshot: buildTaskBlockSnapshot(
+              block.content,
+              groupedTemplateProfiles[0],
+              groupedTemplateProfiles,
+              trigger.ruleOverrides,
+            ),
+            scheduledAt,
+            state: 'queued',
+          },
+        });
+        result.tasksEnqueued++;
+        continue;
+      }
 
       for (const contactId of contactIds) {
         const existing = await prisma.automationTask.findFirst({
@@ -210,7 +505,12 @@ export async function materializeFromEvent(
             contactId,
             // No sequence — block-bound tasks have currentStepIdx=null
             currentBlockId: block.id,
-            blockSnapshot: block.content as object,
+            blockSnapshot: buildTaskBlockSnapshot(
+              block.content,
+              segmentResolution.templateProfileByContactId.get(contactId),
+              undefined,
+              trigger.ruleOverrides,
+            ),
             scheduledAt,
             state: 'queued',
           },
@@ -242,11 +542,12 @@ export async function materializeFromEvent(
     }
 
     // 3. Resolve contacts
-    const contactIds = await resolveSegmentContactIds(
+    const segmentResolution = await resolveSegmentContacts(
       event.orgId,
       trigger.segmentSpec ?? event.segmentHint,
       event.contactId ?? null,
     );
+    const contactIds = segmentResolution.contactIds;
     if (contactIds.length === 0) {
       result.skipped++;
       result.reasons.push(`trigger ${trigger.id}: no contacts resolved`);
@@ -328,7 +629,12 @@ export async function materializeFromEvent(
           sequenceId: trigger.sequenceId,
           currentStepIdx: 0,
           currentBlockId: firstBlock.id,
-          blockSnapshot: firstBlock.content as object, // SNAPSHOT — frozen content
+          blockSnapshot: buildTaskBlockSnapshot(
+            firstBlock.content,
+            segmentResolution.templateProfileByContactId.get(contactId),
+            undefined,
+            trigger.ruleOverrides,
+          ), // SNAPSHOT — frozen content
           scheduledAt,
           state: 'queued',
         },

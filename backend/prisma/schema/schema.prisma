@@ -1907,6 +1907,13 @@ model CustomerListEntry {
   // Tên field cố ý KHÔNG là `notes` để tránh nhầm với Contact.notes (CRM internal notes).
   personalNote String? @map("personal_note")
 
+  // Extra profile fields imported from customer-list source file.
+  birthDate  DateTime? @map("birth_date") @db.Date
+  gender     String? // male/female/other/unknown
+  occupation String?
+  unit       String?
+  birthdayWish String? @map("birthday_wish")
+
   // 2026-05-20: 2-axis status refactor.
   // Lifecycle (5 state) đọc từ `status` + `hasZalo`:
   //   Mới — entry vừa insert (status=pending/validated, chưa qua worker)
@@ -1971,6 +1978,7 @@ model CustomerListEntry {
 
   @@unique([customerListId, rowIndex])
   @@index([customerListId, status])
+  @@index([customerListId, birthDate])
   @@index([customerListId, fbCampaignId])
   @@index([customerListId, fbFormId])
   @@index([phoneE164]) // hot index for cross-list dedup + reverse update

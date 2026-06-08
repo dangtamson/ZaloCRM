@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Thiệp sinh nhật VNPT - Dynamic</title>
+    <style>
+        html,
+        body {
+            margin: 0;
+            background: #111;
+            display: grid;
+            place-items: center;
+            min-height: 100%;
+            font-family: 'Times New Roman', serif
+        }
+
+        .wrap {
+            width: 960px;
+            max-width: 100vw
+        }
+
+        #card {
+            position: relative;
+            width: 960px;
+            height: 1280px;
+            background: url('/automation-assets/image/hpbd.png') center/100% 100% no-repeat;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, .35)
+        }
+
+        /* các mảng che chữ cũ */
+        .patch-name {
+            position: absolute;
+            background: linear-gradient(91deg, #f8eee3 0%, #f5e7dc 100%);
+        }
+
+        .patch-msg {
+            position: absolute;
+            background: linear-gradient(91deg, #f8eee3 0%, #f5e7dc 100%);
+        }
+
+        .patch {
+            position: absolute;
+            background: linear-gradient(91deg, #f8eee3 0%, #f5e7dc 100%);
+        }
+
+        .p-name {
+            left: 145px;
+            top: 270px;
+            width: 640px;
+            height: 99px;
+            border-radius: 18px;
+            filter: blur(.2px);
+        }
+
+        .p-unit {
+            left: 300px;
+            top: 380px;
+            width: 380px;
+            height: 40px;
+            /* background: #06184f; */
+        }
+
+        .p-dob {
+            left: 420px;
+            top: 510px;
+            width: 260px;
+            height: 45px;
+        }
+
+        .p-msg {
+            left: 286px;
+            top: 594px;
+            width: 530px;
+            height: 150px
+        }
+
+        .p-title-l {
+            left: 270px;
+            top: 855px;
+            width: 210px;
+            height: 45px;
+            background: #f7f1e3
+        }
+
+        .p-title-r {
+            left: 535px;
+            top: 855px;
+            width: 240px;
+            height: 45px;
+            background: #f7f1e3
+        }
+
+        .p-signer-l {
+            left: 280px;
+            top: 985px;
+            width: 190px;
+            height: 25px;
+            background: #f7f1e3
+        }
+
+        .p-signer-r {
+            left: 548px;
+            top: 985px;
+            width: 220px;
+            height: 25px;
+            background: #f7f1e3
+        }
+
+        .name {
+            position: absolute;
+            left: 120px;
+            top: 266px;
+            width: 690px;
+            text-align: center;
+            font-family: 'Brush Script MT', 'Segoe Script', cursive;
+            font-size: 64px;
+            line-height: 1;
+            color: #8a5b14;
+            font-style: italic;
+            white-space: nowrap
+        }
+
+        .unit {
+            position: absolute;
+            left: 292px;
+            top: 370px;
+            width: 390px;
+            height: 46px;
+            display: grid;
+            place-items: center;
+            color: white;
+            font-weight: bold;
+            font-size: 25px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .dob {
+            position: absolute;
+            left: 410px;
+            top: 500px;
+            width: 260px;
+            text-align: center;
+            color: #06184a;
+            font-size: 43px;
+            font-weight: bold;
+            letter-spacing: 8px;
+        }
+
+        .message {
+            position: absolute;
+            left: 292px;
+            top: 592px;
+            width: 530px;
+            text-align: center;
+            color: #0b1f5f;
+            font-size: 25px;
+            line-height: 1.55;
+            font-style: italic
+        }
+
+        .title-l,
+        .title-r {
+            position: absolute;
+            top: 850px;
+            text-align: center;
+            color: #0b1f5f;
+            font-size: 14px;
+            font-weight: bold;
+            line-height: 1.55;
+            text-transform: uppercase
+        }
+
+        .title-l {
+            left: 270px;
+            width: 210px
+        }
+
+        .title-r {
+            left: 535px;
+            width: 240px
+        }
+
+        .signer-l,
+        .signer-r {
+            position: absolute;
+            top: 985px;
+            text-align: center;
+            color: #0b1f5f;
+            font-size: 15px;
+            font-weight: bold;
+            text-transform: uppercase
+        }
+
+        .signer-l {
+            left: 280px;
+            width: 190px
+        }
+
+        .signer-r {
+            left: 548px;
+            width: 220px
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            margin: 12px 0
+        }
+
+        .toolbar button {
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 0;
+            cursor: pointer
+        }
+
+        @media(max-width:960px) {
+            #card {
+                transform-origin: top left;
+                transform: scale(calc(100vw / 960));
+            }
+
+            .wrap {
+                height: calc(100vw * 1280 / 960)
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <main id="card">
+            <span class=" p-name"></span><span class="p-unit"></span><span class="p-dob"></span><span
+                class="p-msg"></span>
+            <div class="name" id="name"></div>
+            <div class="unit" id="unit"></div>
+            <div class="dob" id="dob"></div>
+            <div class="message" id="message"></div>
+        </main>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script>
+        const defaults = {
+            name: 'Anh Thái Quang Hiếu',
+            unit: 'VNPT CẦN THƠ',
+            dob: '01/01/0000',
+            message: 'Nhân dịp sinh nhật của Anh, kính chúc Anh luôn dồi dào sức khỏe, hạnh phúc, thành công và tiếp tục dẫn dắt VNPT Cần Thơ phát triển vững mạnh, hoàn thành xuất sắc mọi nhiệm vụ, đóng góp tích cực vào sự phát triển chung của VNPT.'
+        };
+        const p = new URLSearchParams(location.search);
+        function val(k) { return p.get(k) || defaults[k]; }
+        function set(id, k) { document.getElementById(id).innerText = val(k); }
+        set('name', 'name'); set('unit', 'unit'); set('dob', 'dob'); set('message', 'message');
+        set('titleLeft', 'titleLeft'); set('titleRight', 'titleRight'); set('signerLeft', 'signerLeft'); set('signerRight', 'signerRight');
+        async function downloadPNG() {
+            const card = document.getElementById('card');
+            const canvas = await html2canvas(card, { scale: 2, useCORS: true, backgroundColor: null });
+            const a = document.createElement('a'); a.href = canvas.toDataURL('image/png'); a.download = 'thiep-sinh-nhat.png'; a.click();
+        }
+    </script>
+</body>
+
+</html>

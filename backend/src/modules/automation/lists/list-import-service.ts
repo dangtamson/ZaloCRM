@@ -17,6 +17,57 @@ import { prisma } from '../../../shared/database/prisma-client.js';
 import { normalizeVnMobile } from '../../../shared/utils/phone.js';
 import type { ParsedLine, ImportResult, InvalidReason, MappedRow } from './types.js';
 
+function parseBirthDate(input: string | null | undefined): Date | null {
+  const value = (input ?? '').trim();
+  if (!value) return null;
+
+  // Accept dd/mm/yyyy and yyyy-mm-dd.
+  const dmy = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dmy) {
+    const day = Number(dmy[1]);
+    const month = Number(dmy[2]);
+    const year = Number(dmy[3]);
+    const dt = new Date(Date.UTC(year, month - 1, day));
+    if (
+      Number.isFinite(dt.getTime())
+      && dt.getUTCFullYear() === year
+      && dt.getUTCMonth() === month - 1
+      && dt.getUTCDate() === day
+    ) {
+      return dt;
+    }
+    return null;
+  }
+
+  const ymd = value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (ymd) {
+    const year = Number(ymd[1]);
+    const month = Number(ymd[2]);
+    const day = Number(ymd[3]);
+    const dt = new Date(Date.UTC(year, month - 1, day));
+    if (
+      Number.isFinite(dt.getTime())
+      && dt.getUTCFullYear() === year
+      && dt.getUTCMonth() === month - 1
+      && dt.getUTCDate() === day
+    ) {
+      return dt;
+    }
+  }
+
+  return null;
+}
+
+export function normalizeGender(input: string | null | undefined): string | null {
+  const raw = (input ?? '').trim().toLowerCase();
+  if (!raw) return null;
+  if (['male', 'm', 'nam'].includes(raw)) return 'male';
+  if (['female', 'f', 'nu', 'nữ'].includes(raw)) return 'female';
+  if (['other', 'khac', 'khác'].includes(raw)) return 'other';
+  if (['unknown', 'unk', 'khong ro', 'không rõ'].includes(raw)) return 'unknown';
+  return null;
+}
+
 /**
  * Strip các prefix nhiễu phổ biến khi user copy từ Zalo/Excel:
  *   "p:+84..."  → "+84..."   (Zalo SDK link copy)
@@ -94,6 +145,11 @@ export function parseMappedRows(rows: MappedRow[]): ParsedLine[] {
     const parsed = parseSingleLine(String(row.phone), rowIndex, {
       name: row.name ?? null,
       personalNote: row.personalNote ?? null,
+      birthDate: parseBirthDate(row.birthDate ?? null),
+      gender: normalizeGender(row.gender ?? null),
+      occupation: row.occupation?.trim() || null,
+      unit: row.unit?.trim() || null,
+      birthdayWish: row.birthdayWish?.trim() || null,
     });
     results.push(parsed);
   }
@@ -107,7 +163,15 @@ export function parseMappedRows(rows: MappedRow[]): ParsedLine[] {
 function parseSingleLine(
   line: string,
   rowIndex: number,
-  override?: { name: string | null; personalNote: string | null },
+  override?: {
+    name: string | null;
+    personalNote: string | null;
+    birthDate: Date | null;
+    gender: string | null;
+    occupation: string | null;
+    unit: string | null;
+    birthdayWish: string | null;
+  },
 ): ParsedLine {
   const original = line;
   const cleaned = stripPhonePrefix(line.trim());
@@ -122,6 +186,11 @@ function parseSingleLine(
       phoneLocal: null,
       nameRaw: override?.name?.trim() || null,
       personalNote: override?.personalNote?.trim() || null,
+      birthDate: override?.birthDate ?? null,
+      gender: override?.gender ?? null,
+      occupation: override?.occupation ?? null,
+      unit: override?.unit ?? null,
+      birthdayWish: override?.birthdayWish ?? null,
       valid: false,
       invalidReason: 'invalid_format' satisfies InvalidReason,
     };
@@ -133,13 +202,28 @@ function parseSingleLine(
   // Name: nếu override thì dùng, ngược lại cắt từ phần sau phone
   let nameRaw: string | null;
   let personalNote: string | null;
+  let birthDate: Date | null;
+  let gender: string | null;
+  let occupation: string | null;
+  let unit: string | null;
+  let birthdayWish: string | null;
   if (override) {
     nameRaw = override.name?.trim() || null;
     personalNote = override.personalNote?.trim() || null;
+    birthDate = override.birthDate ?? null;
+    gender = override.gender ?? null;
+    occupation = override.occupation ?? null;
+    unit = override.unit ?? null;
+    birthdayWish = override.birthdayWish ?? null;
   } else {
     // Paste path: chỉ lấy name (KHÔNG note) — cắt phần đầu trước comma/tab + strip ngoặc cuối
     nameRaw = null;
     personalNote = null;
+    birthDate = null;
+    gender = null;
+    occupation = null;
+    unit = null;
+    birthdayWish = null;
     if (restRaw) {
       const namePart = restRaw.split(/[,\t]/)[0].trim();
       nameRaw = namePart.replace(/\s*\([^)]*\)\s*$/, '').trim() || null;
@@ -169,6 +253,11 @@ function parseSingleLine(
       phoneLocal: null,
       nameRaw,
       personalNote,
+      birthDate,
+      gender,
+      occupation,
+      unit,
+      birthdayWish,
       valid: false,
       invalidReason: reason,
     };
@@ -184,6 +273,11 @@ function parseSingleLine(
       phoneLocal: null,
       nameRaw,
       personalNote,
+      birthDate,
+      gender,
+      occupation,
+      unit,
+      birthdayWish,
       valid: false,
       invalidReason: 'invalid_prefix' satisfies InvalidReason,
     };
@@ -196,6 +290,11 @@ function parseSingleLine(
     phoneLocal: local,
     nameRaw,
     personalNote,
+    birthDate,
+    gender,
+    occupation,
+    unit,
+    birthdayWish,
     valid: true,
     invalidReason: null,
   };
@@ -251,6 +350,11 @@ export async function revalidatePhone(
     phoneLocal: null,
     nameRaw: null,
     personalNote: null,
+    birthDate: null,
+    gender: null,
+    occupation: null,
+    unit: null,
+    birthdayWish: null,
     valid: false,
     invalidReason: 'empty',
   };

@@ -5,7 +5,7 @@
  *   GET    /api/v1/customer-lists/:id/entries           — paginated entries with tab filter
  *   POST   /api/v1/customer-lists/:id/entries           — append entries (single line or bulk paste)
  *   POST   /api/v1/customer-lists/:id/entries/bulk      — bulk resolve dup (skip/overwrite/keep)
- *   PATCH  /api/v1/customer-lists/:id/entries/:entryId  — edit phoneRaw/nameRaw/personalNote
+ *   PATCH  /api/v1/customer-lists/:id/entries/:entryId  — edit phoneRaw/nameRaw/personalNote/birthDate/gender/occupation/unit/birthdayWish
  *   DELETE /api/v1/customer-lists/:id/entries/:entryId  — delete 1 entry
  */
 
@@ -13,7 +13,7 @@ import type { FastifyInstance } from 'fastify';
 import { prisma } from '../../../shared/database/prisma-client.js';
 import { authMiddleware } from '../../auth/auth-middleware.js';
 import { logger } from '../../../shared/utils/logger.js';
-import { revalidatePhone, parseAndDedup } from './list-import-service.js';
+import { normalizeGender, revalidatePhone, parseAndDedup } from './list-import-service.js';
 import { kickoffEnrichment } from './list-enrichment-service.js';
 import {
   appendSystemMessage,
@@ -113,9 +113,9 @@ export async function customerListEntryRoutes(app: FastifyInstance): Promise<voi
       const nickIds = [...new Set(entries.map((e) => e.resolvedByNickId).filter((x): x is string => !!x))];
       const nicks = nickIds.length
         ? await prisma.zaloAccount.findMany({
-            where: { id: { in: nickIds } },
-            select: { id: true, displayName: true, phone: true },
-          })
+          where: { id: { in: nickIds } },
+          select: { id: true, displayName: true, phone: true },
+        })
         : [];
       const nickMap = new Map(nicks.map((n) => [n.id, n]));
 
@@ -123,9 +123,9 @@ export async function customerListEntryRoutes(app: FastifyInstance): Promise<voi
       const dupListIds = [...new Set(entries.map((e) => e.dupWithListId).filter((x): x is string => !!x))];
       const dupLists = dupListIds.length
         ? await prisma.customerList.findMany({
-            where: { id: { in: dupListIds }, orgId: user.orgId },
-            select: { id: true, name: true },
-          })
+          where: { id: { in: dupListIds }, orgId: user.orgId },
+          select: { id: true, name: true },
+        })
         : [];
       const dupListMap = new Map(dupLists.map((l) => [l.id, l.name]));
 
@@ -219,15 +219,25 @@ export async function customerListEntryRoutes(app: FastifyInstance): Promise<voi
   });
 
   // ─── PATCH /customer-lists/:id/entries/:entryId — edit + re-validate + re-dedup ───
-  // Cells editable: phoneRaw (re-parse + re-dedup + reset enrichment), nameRaw, personalNote.
+  // Cells editable: phoneRaw (re-parse + re-dedup + reset enrichment),
+  // nameRaw, personalNote, birthDate, gender, occupation, unit, birthdayWish.
   // Cột phoneE164/phoneLocal auto-derive — KHÔNG cho client gửi.
   app.patch<{
     Params: { id: string; entryId: string };
-    Body: { phoneRaw?: string; nameRaw?: string | null; personalNote?: string | null };
+    Body: {
+      phoneRaw?: string;
+      nameRaw?: string | null;
+      personalNote?: string | null;
+      birthDate?: string | null;
+      gender?: string | null;
+      occupation?: string | null;
+      unit?: string | null;
+      birthdayWish?: string | null;
+    };
   }>('/api/v1/customer-lists/:id/entries/:entryId', async (request, reply) => {
     const user = request.user!;
     const { id, entryId } = request.params;
-    const { phoneRaw, nameRaw, personalNote } = request.body ?? {};
+    const { phoneRaw, nameRaw, personalNote, birthDate, gender, occupation, unit, birthdayWish } = request.body ?? {};
 
     const list = await prisma.customerList.findFirst({
       where: { id, orgId: user.orgId },
@@ -293,6 +303,30 @@ export async function customerListEntryRoutes(app: FastifyInstance): Promise<voi
       }
       if (personalNote !== undefined) {
         data.personalNote = personalNote ? String(personalNote).slice(0, 2000) : null;
+      }
+      if (birthDate !== undefined) {
+        if (birthDate === null || birthDate === '') {
+          data.birthDate = null;
+        } else if (/^\d{4}-\d{2}-\d{2}$/.test(String(birthDate))) {
+          data.birthDate = new Date(`${birthDate}T00:00:00.000Z`);
+        } else if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(String(birthDate))) {
+          const [dd, mm, yyyy] = String(birthDate).split('/').map(Number);
+          data.birthDate = new Date(Date.UTC(yyyy, mm - 1, dd));
+        } else {
+          return reply.status(400).send({ error: 'birthDate_invalid_format' });
+        }
+      }
+      if (gender !== undefined) {
+        data.gender = normalizeGender(gender);
+      }
+      if (occupation !== undefined) {
+        data.occupation = occupation ? String(occupation).slice(0, 200) : null;
+      }
+      if (unit !== undefined) {
+        data.unit = unit ? String(unit).slice(0, 200) : null;
+      }
+      if (birthdayWish !== undefined) {
+        data.birthdayWish = birthdayWish ? String(birthdayWish).slice(0, 2000) : null;
       }
 
       if (Object.keys(data).length === 0) {
@@ -371,10 +405,10 @@ export async function customerListEntryRoutes(app: FastifyInstance): Promise<voi
       const validPhones = lines.filter((l) => l.valid && l.phoneE164).map((l) => l.phoneE164!);
       const existingInList = validPhones.length
         ? await prisma.customerListEntry.findMany({
-            where: { customerListId: id, phoneE164: { in: validPhones } },
-            select: { id: true, phoneE164: true },
-            orderBy: { createdAt: 'asc' },
-          })
+          where: { customerListId: id, phoneE164: { in: validPhones } },
+          select: { id: true, phoneE164: true },
+          orderBy: { createdAt: 'asc' },
+        })
         : [];
       const existingByPhone = new Map<string, string>();
       for (const e of existingInList) {
@@ -446,6 +480,11 @@ export async function customerListEntryRoutes(app: FastifyInstance): Promise<voi
           phoneRaw: line.phoneRaw.slice(0, 500),
           nameRaw: line.nameRaw,
           personalNote: line.personalNote ? line.personalNote.slice(0, 2000) : null,
+          birthDate: line.birthDate,
+          gender: line.gender,
+          occupation: line.occupation,
+          unit: line.unit,
+          birthdayWish: line.birthdayWish,
           phoneE164: line.phoneE164,
           phoneLocal: line.phoneLocal,
           phoneValid: line.valid,

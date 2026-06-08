@@ -25,6 +25,14 @@ export interface Contact {
   zaloGlobalId?: string | null;
   zaloUsername?: string | null;
   _count?: { conversations?: number; appointments?: number; children?: number };
+  conversations?: Array<{
+    id: string;
+    zaloAccountId: string;
+    externalThreadId: string | null;
+    threadType: string;
+    groupName?: string | null;
+    groupAvatarUrl?: string | null;
+  }>;
   // Aggregate Friend rows theo relationshipKind: friend / pending_friend / chatting_stranger / ghost
   nicksByKind?: Record<string, number>;
   // Parent-child fields (PR 1/PR 2 new):

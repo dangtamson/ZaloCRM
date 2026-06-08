@@ -193,7 +193,7 @@ export const TRIGGER_CATALOG: TriggerCatalogEntry[] = [
     eventType: 'scheduled_cron',
     category: 'general',
     title: 'Theo lịch định kỳ',
-    description: 'Cron expression tuỳ ý — broadcast hằng tuần, follow-up hằng tháng...',
+    description: 'Cron expression tuỳ ý — broadcast hằng tuần, follow-up hằng tháng, quét sinh nhật tuần từ customer-list...',
     recommendedBinding: 'broadcast',
   },
   {

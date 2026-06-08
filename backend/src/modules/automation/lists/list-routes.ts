@@ -155,7 +155,19 @@ export async function customerListRoutes(app: FastifyInstance): Promise<void> {
   // ─── POST /customer-lists/dry-run — preview parse stats, NO persist ───
   // Body: { rawText } (paste path) HOẶC { rows: MappedRow[] } (CSV/Excel path)
   app.post<{
-    Body: { rawText?: string; rows?: Array<{ phone: string; name?: string | null; personalNote?: string | null }> };
+    Body: {
+      rawText?: string;
+      rows?: Array<{
+        phone: string;
+        name?: string | null;
+        personalNote?: string | null;
+        birthDate?: string | null;
+        gender?: string | null;
+        occupation?: string | null;
+        unit?: string | null;
+        birthdayWish?: string | null;
+      }>;
+    };
   }>(
     '/api/v1/customer-lists/dry-run',
     async (request, reply) => {
@@ -196,7 +208,16 @@ export async function customerListRoutes(app: FastifyInstance): Promise<void> {
       iconEmoji?: string;
       sourceType?: string;
       rawText?: string;
-      rows?: Array<{ phone: string; name?: string | null; personalNote?: string | null }>;
+      rows?: Array<{
+        phone: string;
+        name?: string | null;
+        personalNote?: string | null;
+        birthDate?: string | null;
+        gender?: string | null;
+        occupation?: string | null;
+        unit?: string | null;
+        birthdayWish?: string | null;
+      }>;
     };
   }>('/api/v1/customer-lists', async (request, reply) => {
     const user = request.user!;
@@ -320,6 +341,11 @@ export async function customerListRoutes(app: FastifyInstance): Promise<void> {
             phoneRaw: line.phoneRaw.slice(0, 500),
             nameRaw: line.nameRaw,
             personalNote: line.personalNote ? line.personalNote.slice(0, 2000) : null,
+            birthDate: line.birthDate,
+            gender: line.gender,
+            occupation: line.occupation,
+            unit: line.unit,
+            birthdayWish: line.birthdayWish,
             phoneE164: line.phoneE164,
             phoneLocal: line.phoneLocal,
             phoneValid: line.valid,
