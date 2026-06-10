@@ -21,8 +21,22 @@ describe('automation routes', () => {
 
   it('loads bot triggers from the automation API', async () => {
     apiClient.defaults.adapter = async (config) => {
-      expect(config.url).toBe('/automation/triggers');
-      return response(config, { triggers: [{ id: 't1', name: 'Chào khách mới', eventType: 'contact_created', enabled: true }] });
+      if (config.url === '/automation/triggers/catalog') {
+        return response(config, { catalog: [{ eventType: 'contact_created', title: 'Contact created', category: 'general' }] });
+      }
+      if (config.url === '/automation/triggers') {
+        return response(config, { triggers: [{ id: 't1', name: 'Chào khách mới', eventType: 'contact_created', bindingKind: 'sequence', enabled: true }] });
+      }
+      if (config.url === '/automation/sequences') {
+        return response(config, { sequences: [] });
+      }
+      if (config.url === '/automation/blocks') {
+        return response(config, { blocks: [] });
+      }
+      if (config.url === '/customer-lists') {
+        return response(config, []);
+      }
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`);
     };
 
     render(<RouterProvider router={createMemoryAppRouter(['/automation/bot/triggers'])} />);
