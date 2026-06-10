@@ -1,9 +1,10 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
-import { RouterProvider } from 'react-router-dom';
+import { RouterProvider, createMemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { authStore } from '../store/auth';
 import { createMemoryAppRouter } from './index';
+import RouteErrorPage from '../pages/RouteErrorPage';
 
 function renderRoute(path: string) {
   return render(<RouterProvider router={createMemoryAppRouter([path])} />);
@@ -77,5 +78,26 @@ describe('React app routing shell', () => {
     renderRoute('/settings?tab=scoring');
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Settings.Scoring' })).toBeInTheDocument());
+  });
+
+  it('renders a branded route error page instead of React Router default copy', async () => {
+    function BrokenRoute() {
+      throw new Error('boom');
+    }
+
+    render(
+      <RouterProvider
+        router={createMemoryRouter([
+          {
+            path: '/',
+            element: <BrokenRoute />,
+            errorElement: <RouteErrorPage />,
+          },
+        ])}
+      />,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Không tải được màn hình' })).toBeInTheDocument();
+    expect(screen.queryByText('Unexpected Application Error!')).not.toBeInTheDocument();
   });
 });

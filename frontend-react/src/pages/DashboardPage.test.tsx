@@ -46,4 +46,33 @@ describe('DashboardPage', () => {
     expect(screen.getByText('Quan tâm')).toBeInTheDocument();
     expect(screen.getByText('Facebook')).toBeInTheDocument();
   });
+
+  it('normalizes dashboard collection envelopes from the backend', async () => {
+    apiClient.defaults.adapter = async (config) => {
+      const dataByUrl: Record<string, unknown> = {
+        '/dashboard/kpi': {
+          messagesToday: 4,
+          messagesUnreplied: 1,
+          messagesUnread: 2,
+          appointmentsToday: 3,
+          newContactsThisWeek: 8,
+          totalContacts: 40,
+        },
+        '/dashboard/message-volume': { data: [{ date: '2026-06-10', sent: 3, received: 2 }] },
+        '/dashboard/pipeline': { data: [{ status: 'Đang tư vấn', count: 5 }] },
+        '/dashboard/sources': { data: [{ source: 'Zalo', count: 7 }] },
+        '/dashboard/appointments': { data: [{ status: 'scheduled', count: 3 }] },
+      };
+      return response(config, dataByUrl[config.url ?? '']);
+    };
+
+    render(<RouterProvider router={createMemoryAppRouter(['/'])} />);
+
+    expect(await screen.findByText('Đang tư vấn')).toBeInTheDocument();
+    expect(screen.getByText('Zalo')).toBeInTheDocument();
+    expect(screen.getByText('scheduled')).toBeInTheDocument();
+    expect(screen.getAllByText('3')).not.toHaveLength(0);
+    expect(screen.getByText('5')).toBeInTheDocument();
+    expect(screen.getByText('7')).toBeInTheDocument();
+  });
 });

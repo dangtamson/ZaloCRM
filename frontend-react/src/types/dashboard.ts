@@ -19,19 +19,23 @@ export interface CountValue {
 
 export interface PipelineItem {
   status: string | null;
-  _count: CountValue | number;
+  _count?: CountValue | number;
+  count?: number;
 }
 
 export interface SourceItem {
   source: string;
-  _count: CountValue | number;
+  _count?: CountValue | number;
+  count?: number;
 }
 
 export interface AppointmentStatusItem {
   status: string;
-  _count: CountValue | number;
+  _count?: CountValue | number;
+  count?: number;
 }
 
-export function getCount(value: CountValue | number): number {
-  return typeof value === 'number' ? value : value._all;
+export function getCount(value: CountValue | number | undefined): number {
+  if (typeof value === 'number') return value;
+  return value?._all ?? 0;
 }

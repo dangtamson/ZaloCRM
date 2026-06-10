@@ -29,6 +29,7 @@ import PersonalPasswordPage from '../pages/settings/PersonalPasswordPage';
 import PersonalProfilePage from '../pages/settings/PersonalProfilePage';
 import ProfilePage from '../pages/ProfilePage';
 import ReportsPage from '../pages/ReportsPage';
+import RouteErrorPage from '../pages/RouteErrorPage';
 import SequencesPage from '../pages/automation/SequencesPage';
 import SetupPage from '../pages/SetupPage';
 import SettingsComingSoon from '../pages/settings/SettingsComingSoon';
@@ -153,6 +154,7 @@ const automationChildren = [
 export const appRoutes = [
   {
     element: <AuthRouteLayout />,
+    errorElement: <RouteErrorPage />,
     children: [
       { path: '/login', element: <LoginPage /> },
       { path: '/setup', element: <SetupPage /> },
@@ -160,6 +162,7 @@ export const appRoutes = [
   },
   {
     element: <RequireAuth />,
+    errorElement: <RouteErrorPage />,
     children: [
       { path: '/', element: <DashboardPage /> },
       { path: '/chat/:convId?', element: <ChatPage /> },
@@ -183,7 +186,7 @@ export const appRoutes = [
       { path: '/friends', element: <FriendsPage /> },
     ],
   },
-  { path: '*', element: <NotFoundPage /> },
+  { path: '*', element: <NotFoundPage />, errorElement: <RouteErrorPage /> },
 ];
 
 export function createMemoryAppRouter(initialEntries: string[] = ['/']) {
