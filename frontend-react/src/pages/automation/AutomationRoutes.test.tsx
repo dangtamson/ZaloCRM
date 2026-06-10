@@ -71,4 +71,24 @@ describe('automation routes', () => {
     expect(await screen.findByText('Nguyen Lead')).toBeInTheDocument();
     expect(screen.getByText('0988888888')).toBeInTheDocument();
   });
+
+  it('loads broadcasts from the automation API', async () => {
+    apiClient.defaults.adapter = async (config) => {
+      if (config.url === '/automation/broadcasts') {
+        return response(config, { broadcasts: [{ id: 'b1', name: 'Broadcast nháp', blockId: 'block-1', segmentSpec: { kind: 'filter', criteria: {} }, scheduleKind: 'now', state: 'draft', totalRecipients: 0, sentCount: 0, failedCount: 0 }] });
+      }
+      if (config.url === '/automation/blocks') {
+        return response(config, { blocks: [{ id: 'block-1', name: 'Block gửi tin', actionType: 'send_message' }] });
+      }
+      if (config.url === '/customer-lists') {
+        return response(config, { lists: [] });
+      }
+      throw new Error(`Unexpected request: ${config.method} ${config.url}`);
+    };
+
+    render(<RouterProvider router={createMemoryAppRouter(['/automation/bot/broadcasts'])} />);
+
+    expect(await screen.findByText('Broadcast nháp')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Broadcast mới' })).toBeInTheDocument();
+  });
 });
