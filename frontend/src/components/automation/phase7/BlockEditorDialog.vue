@@ -533,7 +533,7 @@ function renderTemplatePreview(template: string) {
     'contact.birthdayWish': `Nhân dịp sinh nhật của ${previewSalutation}, kính chúc ${previewSalutation} luôn dồi dào sức khỏe, hạnh phúc, thành công.`,
     'contact.birthdayWishLine1': `Nhân dịp sinh nhật của ${previewSalutation}, kính chúc ${previewSalutation} luôn`,
     'contact.birthdayWishLine2': 'dồi dào sức khỏe, hạnh phúc, thành công và tiếp tục',
-    'contact.birthdayWishLine3': `đồng hành với ${previewUnit} phát triển vững mạnh,`,
+    'contact.birthdayWishLine3': `đồng hành cùng với tập thể phát triển vững mạnh,`,
     'contact.birthdayWishLine4': 'hoàn thành xuất sắc mọi nhiệm vụ, đóng góp tích cực',
     'contact.birthdayWishLine5': 'vào sự phát triển chung của VNPT.',
     'org.name': previewUnit,
