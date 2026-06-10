@@ -5,9 +5,15 @@ import MobileLayout from '../layouts/MobileLayout';
 import { useMobile } from '../hooks/useMobile';
 import { useAuthStore } from '../store/auth';
 import AnalyticsPage from '../pages/AnalyticsPage';
+import AppointmentsPage from '../pages/crm/AppointmentsPage';
 import CrmTagManagement from '../components/settings/CrmTagManagement';
+import ContactProfilePage from '../pages/crm/ContactProfilePage';
+import ContactsPage from '../pages/crm/ContactsPage';
+import CustomerActivityLogPage from '../pages/crm/CustomerActivityLogPage';
 import DashboardPage from '../pages/DashboardPage';
 import DepartmentsPage from '../pages/rbac/DepartmentsPage';
+import FriendsPage from '../pages/crm/FriendsPage';
+import GroupsPage from '../pages/crm/GroupsPage';
 import LoginPage from '../pages/LoginPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import OrgSettings from '../components/settings/OrgSettings';
@@ -20,7 +26,9 @@ import SetupPage from '../pages/SetupPage';
 import SettingsComingSoon from '../pages/settings/SettingsComingSoon';
 import SettingsLayout from '../pages/settings/SettingsLayout';
 import StatusManagement from '../components/settings/StatusManagement';
+import StuckLeadsPage from '../pages/crm/StuckLeadsPage';
 import UsersPage from '../pages/rbac/UsersPage';
+import ZaloAccountsPage from '../pages/crm/ZaloAccountsPage';
 import ZaloLabelsManagement from '../components/settings/ZaloLabelsManagement';
 
 const LEGACY_SETTINGS_TAB_MAP: Record<string, string> = {
@@ -146,24 +154,24 @@ export const appRoutes = [
     children: [
       { path: '/', element: <DashboardPage /> },
       { path: '/chat/:convId?', element: <PlaceholderPage title="Chat" /> },
-      { path: '/contacts', element: <PlaceholderPage title="Contacts" /> },
+      { path: '/contacts', element: <ContactsPage /> },
       { path: '/profile', element: <ProfilePage /> },
-      { path: '/appointments', element: <PlaceholderPage title="Appointments" /> },
+      { path: '/appointments', element: <AppointmentsPage /> },
       { path: '/reports', element: <ReportsPage /> },
       { path: '/analytics', element: <AnalyticsPage /> },
       { path: '/settings/zalo-labels', element: <Navigate replace to="/settings/crm/zalo-labels" /> },
       { path: '/settings/scoring', element: <Navigate replace to="/settings/crm/scoring" /> },
       { path: '/api-settings', element: <Navigate replace to="/settings/dev/api" /> },
       { path: '/integrations', element: <Navigate replace to="/settings/channels/integrations" /> },
-      { path: '/zalo-accounts', element: <Navigate replace to="/settings/channels/zalo" /> },
+      { path: '/zalo-accounts', element: <ZaloAccountsPage /> },
       { path: '/settings', element: <SettingsLayout />, children: settingsChildren },
-      { path: '/customers/:id/activity', element: <PlaceholderPage title="CustomerActivityLog" /> },
-      { path: '/contacts/:id/profile', element: <PlaceholderPage title="ContactProfile" /> },
-      { path: '/leads/stuck', element: <PlaceholderPage title="StuckLeads" /> },
+      { path: '/customers/:id/activity', element: <CustomerActivityLogPage /> },
+      { path: '/contacts/:id/profile', element: <ContactProfilePage /> },
+      { path: '/leads/stuck', element: <StuckLeadsPage /> },
       { path: '/automation', element: <PlaceholderPage title="Automation" /> },
       { path: '/automation/bot', children: automationChildren },
-      { path: '/groups', element: <PlaceholderPage title="Groups" /> },
-      { path: '/friends', element: <PlaceholderPage title="Friends" /> },
+      { path: '/groups', element: <GroupsPage /> },
+      { path: '/friends', element: <FriendsPage /> },
     ],
   },
   { path: '*', element: <NotFoundPage /> },

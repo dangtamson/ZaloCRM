@@ -305,15 +305,15 @@ Verify deep links under `/settings/*` resolve and preserve the legacy redirects.
 - Create: `frontend-react/src/components/appointments/AppointmentsListView.tsx`
 - Create: `frontend-react/src/components/appointments/AppointmentEditor.tsx`
 
-- [ ] **Step 1: Port the lower-risk list views**
+- [x] **Step 1: Port the lower-risk list views**
 
 Start with contacts, friends, groups, and Zalo accounts so list/table rendering, filters, and drawers are proven before chat and automation.
 
-- [ ] **Step 2: Port appointments and stuck leads**
+- [x] **Step 2: Port appointments and stuck leads**
 
 Move calendar/list interactions, filters, and the stuck-leads workflow after the core CRUD screens are stable.
 
-- [ ] **Step 3: Add list/detail tests**
+- [x] **Step 3: Add list/detail tests**
 
 Create:
 ```ts
