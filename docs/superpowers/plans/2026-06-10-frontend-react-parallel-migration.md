@@ -422,7 +422,7 @@ Verify conversation switching, unread counts, reply rendering, and socket update
 
 Update the Docker build stage so the production image builds `frontend-react` and copies its output to the same static directory currently served by the backend.
 
-- [ ] **Step 2: Align deployment and local dev docs**
+- [x] **Step 2: Align deployment and local dev docs**
 
 Document the new dev command, expected ports, and the cutover path from Vue to React so the team can run both apps during the transition.
 

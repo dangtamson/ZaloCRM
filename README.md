@@ -124,6 +124,18 @@ docker compose up -d --build
 
 Truy cập **http://IP-server:3080** → Tạo tài khoản admin lần đầu.
 
+## Frontend song song Vue + React
+
+Repo hiện có hai frontend để phục vụ quá trình migration:
+
+| App | Thư mục | Vai trò | Lệnh dev |
+|---|---|---|---|
+| Vue legacy | `frontend/` | Frontend production hiện tại, vẫn là nguồn build Docker mặc định | `cd frontend && npm run dev` |
+| React migration | `frontend-react/` | App React + Tailwind chạy song song để port từng module | `cd frontend-react && npm run dev -- --host 127.0.0.1 --port 5174` |
+
+React app dùng cùng backend API (`/api/v1`) và đang được port theo kế hoạch trong `docs/superpowers/plans/2026-06-10-frontend-react-parallel-migration.md`.
+Chỉ switch Docker production từ `frontend/` sang `frontend-react/` sau khi có sign-off parity cho các route chính.
+
 ### Tạo secret keys
 ```bash
 # JWT_SECRET (32+ chars)
