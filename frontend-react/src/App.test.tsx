@@ -3,9 +3,9 @@ import { render, screen } from '@testing-library/react';
 import App from './App';
 
 describe('App', () => {
-  it('renders the scaffold home page', () => {
+  it('renders the unauthenticated login route by default', async () => {
     render(<App />);
 
-    expect(screen.getByRole('heading', { name: 'frontend-react' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Login' })).toBeInTheDocument();
   });
 });
