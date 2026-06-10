@@ -5,12 +5,23 @@ import MobileLayout from '../layouts/MobileLayout';
 import { useMobile } from '../hooks/useMobile';
 import { useAuthStore } from '../store/auth';
 import AnalyticsPage from '../pages/AnalyticsPage';
+import CrmTagManagement from '../components/settings/CrmTagManagement';
 import DashboardPage from '../pages/DashboardPage';
+import DepartmentsPage from '../pages/rbac/DepartmentsPage';
 import LoginPage from '../pages/LoginPage';
 import NotFoundPage from '../pages/NotFoundPage';
+import OrgSettings from '../components/settings/OrgSettings';
+import PermissionGroupsPage from '../pages/rbac/PermissionGroupsPage';
+import PersonalPasswordPage from '../pages/settings/PersonalPasswordPage';
+import PersonalProfilePage from '../pages/settings/PersonalProfilePage';
 import ProfilePage from '../pages/ProfilePage';
 import ReportsPage from '../pages/ReportsPage';
 import SetupPage from '../pages/SetupPage';
+import SettingsComingSoon from '../pages/settings/SettingsComingSoon';
+import SettingsLayout from '../pages/settings/SettingsLayout';
+import StatusManagement from '../components/settings/StatusManagement';
+import UsersPage from '../pages/rbac/UsersPage';
+import ZaloLabelsManagement from '../components/settings/ZaloLabelsManagement';
 
 const LEGACY_SETTINGS_TAB_MAP: Record<string, string> = {
   users: '/settings/team/users',
@@ -79,37 +90,37 @@ function SettingsIndexRedirect() {
 
 const settingsChildren = [
   { index: true, element: <SettingsIndexRedirect /> },
-  { path: 'personal/profile', element: <PlaceholderPage title="Settings.Profile" /> },
-  { path: 'personal/password', element: <PlaceholderPage title="Settings.Password" /> },
-  { path: 'personal/notifications', element: <PlaceholderPage title="Settings.Notifications" /> },
-  { path: 'personal/theme', element: <PlaceholderPage title="Settings.Theme" /> },
-  { path: 'personal/sessions', element: <PlaceholderPage title="Settings.Sessions" /> },
-  { path: 'org/profile', element: <PlaceholderPage title="Settings.OrgProfile" /> },
-  { path: 'org/billing', element: <PlaceholderPage title="Settings.Billing" /> },
-  { path: 'org/audit', element: <PlaceholderPage title="Settings.Audit" /> },
+  { path: 'personal/profile', element: <PersonalProfilePage /> },
+  { path: 'personal/password', element: <PersonalPasswordPage /> },
+  { path: 'personal/notifications', element: <SettingsComingSoon title="Thông báo" /> },
+  { path: 'personal/theme', element: <SettingsComingSoon title="Giao diện" /> },
+  { path: 'personal/sessions', element: <SettingsComingSoon title="Phiên đăng nhập" /> },
+  { path: 'org/profile', element: <OrgSettings /> },
+  { path: 'org/billing', element: <SettingsComingSoon title="Thanh toán" /> },
+  { path: 'org/audit', element: <SettingsComingSoon title="Audit" /> },
   { path: 'team/users', element: <Navigate replace to="/settings/rbac/users" /> },
   { path: 'team/teams', element: <Navigate replace to="/settings/rbac/departments" /> },
   { path: 'team/roles', element: <Navigate replace to="/settings/rbac/permission-groups" /> },
-  { path: 'rbac/departments', element: <PlaceholderPage title="Settings.RbacDepartments" /> },
-  { path: 'rbac/permission-groups', element: <PlaceholderPage title="Settings.RbacPermissionGroups" /> },
-  { path: 'rbac/users', element: <PlaceholderPage title="Settings.RbacUsers" /> },
-  { path: 'privacy', element: <PlaceholderPage title="Settings.Privacy" /> },
-  { path: 'crm/statuses', element: <PlaceholderPage title="Settings.Statuses" /> },
-  { path: 'crm/tags', element: <PlaceholderPage title="Settings.Tags" /> },
-  { path: 'crm/zalo-labels', element: <PlaceholderPage title="Settings.ZaloLabels" /> },
-  { path: 'crm/scoring', element: <PlaceholderPage title="Settings.Scoring" /> },
-  { path: 'crm/stuck', element: <PlaceholderPage title="Settings.Stuck" /> },
-  { path: 'crm/folders', element: <PlaceholderPage title="Settings.Folders" /> },
-  { path: 'crm/templates', element: <PlaceholderPage title="Settings.Templates" /> },
-  { path: 'channels/zalo', element: <PlaceholderPage title="Settings.ZaloAccounts" /> },
-  { path: 'channels/facebook', element: <PlaceholderPage title="Settings.Facebook" /> },
-  { path: 'channels/rate-limit', element: <PlaceholderPage title="Settings.RateLimit" /> },
-  { path: 'channels/automation', element: <PlaceholderPage title="Settings.Automation" /> },
-  { path: 'channels/integrations', element: <PlaceholderPage title="Settings.Integrations" /> },
-  { path: 'dev/api', element: <PlaceholderPage title="Settings.Api" /> },
-  { path: 'dev/public-token', element: <PlaceholderPage title="Settings.PublicToken" /> },
-  { path: 'dev/feature-flags', element: <PlaceholderPage title="Settings.FeatureFlags" /> },
-  { path: 'dev/backup', element: <PlaceholderPage title="Settings.Backup" /> },
+  { path: 'rbac/departments', element: <DepartmentsPage /> },
+  { path: 'rbac/permission-groups', element: <PermissionGroupsPage /> },
+  { path: 'rbac/users', element: <UsersPage /> },
+  { path: 'privacy', element: <SettingsComingSoon title="Riêng tư" /> },
+  { path: 'crm/statuses', element: <StatusManagement /> },
+  { path: 'crm/tags', element: <CrmTagManagement /> },
+  { path: 'crm/zalo-labels', element: <ZaloLabelsManagement /> },
+  { path: 'crm/scoring', element: <SettingsComingSoon title="Settings.Scoring" /> },
+  { path: 'crm/stuck', element: <SettingsComingSoon title="KH đình trệ" /> },
+  { path: 'crm/folders', element: <SettingsComingSoon title="Thư mục" /> },
+  { path: 'crm/templates', element: <SettingsComingSoon title="Mẫu tin" /> },
+  { path: 'channels/zalo', element: <SettingsComingSoon title="Tài khoản Zalo" /> },
+  { path: 'channels/facebook', element: <SettingsComingSoon title="Facebook" /> },
+  { path: 'channels/rate-limit', element: <SettingsComingSoon title="Rate limit" /> },
+  { path: 'channels/automation', element: <SettingsComingSoon title="Automation" /> },
+  { path: 'channels/integrations', element: <SettingsComingSoon title="Tích hợp" /> },
+  { path: 'dev/api', element: <SettingsComingSoon title="API & Webhook" /> },
+  { path: 'dev/public-token', element: <SettingsComingSoon title="Public token" /> },
+  { path: 'dev/feature-flags', element: <SettingsComingSoon title="Feature flags" /> },
+  { path: 'dev/backup', element: <SettingsComingSoon title="Backup" /> },
 ];
 
 const automationChildren = [
@@ -145,7 +156,7 @@ export const appRoutes = [
       { path: '/api-settings', element: <Navigate replace to="/settings/dev/api" /> },
       { path: '/integrations', element: <Navigate replace to="/settings/channels/integrations" /> },
       { path: '/zalo-accounts', element: <Navigate replace to="/settings/channels/zalo" /> },
-      { path: '/settings', children: settingsChildren },
+      { path: '/settings', element: <SettingsLayout />, children: settingsChildren },
       { path: '/customers/:id/activity', element: <PlaceholderPage title="CustomerActivityLog" /> },
       { path: '/contacts/:id/profile', element: <PlaceholderPage title="ContactProfile" /> },
       { path: '/leads/stuck', element: <PlaceholderPage title="StuckLeads" /> },
