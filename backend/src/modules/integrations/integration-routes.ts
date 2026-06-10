@@ -23,7 +23,7 @@ export async function integrationRoutes(app: FastifyInstance): Promise<void> {
         orderBy: { createdAt: 'desc' },
         select: {
           id: true, orgId: true, type: true, name: true,
-          enabled: true, lastSyncAt: true, createdAt: true, updatedAt: true,
+          config: true, enabled: true, lastSyncAt: true, createdAt: true, updatedAt: true,
           syncLogs: { take: 5, orderBy: { createdAt: 'desc' } },
         },
       });

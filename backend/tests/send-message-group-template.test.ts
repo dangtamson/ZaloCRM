@@ -8,6 +8,7 @@ const prismaMock = {
   conversation: { findUnique: vi.fn(), create: vi.fn() },
   message: { create: vi.fn() },
   zaloAccount: { findFirst: vi.fn(), update: vi.fn() },
+  integration: { findFirst: vi.fn() },
 };
 
 const zaloOpsMock = {
@@ -61,8 +62,21 @@ beforeEach(() => {
   });
   prismaMock.zaloAccount.findFirst.mockResolvedValue({ id: 'nick-1' });
   prismaMock.zaloAccount.update.mockResolvedValue({});
+  prismaMock.integration.findFirst.mockResolvedValue({
+    id: 'telegram-1',
+    config: {
+      botToken: 'token-1',
+      chatId: '-100123',
+      messageThreadId: '456',
+    },
+  });
   zaloOpsMock.sendMessage.mockResolvedValue({ message: { msgId: 'zmsg-1' } });
   zaloOpsMock.sendImage.mockResolvedValue({ message: { msgId: 'zimg-1' } });
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    text: vi.fn().mockResolvedValue('OK'),
+  }));
   vi.mocked(renderHtmlTemplateToImage).mockResolvedValue({
     url: 'https://crm.example.test/automation-assets/org-1/card.png',
     filePath: '/tmp/card.png',
@@ -178,6 +192,41 @@ describe('sendMessageHandler group target with template', () => {
       'group-123',
       1,
       { msg: 'Chuc mung Anh Tran Trong B - Truong phong' },
+    );
+  });
+
+  it('mirrors the rendered block text to the selected Telegram integration', async () => {
+    const ctx: ActionContext = {
+      orgId: 'org-1',
+      taskId: 'task-1',
+      contactId: 'contact-1',
+      assignedNickId: 'nick-1',
+      actionType: 'send_message',
+      attemptCount: 0,
+      blockSnapshot: {
+        textVariants: ['Xin chao {{contact.crmName}} tu {{org.name}}'],
+        groupTarget: { accountId: 'nick-1', groupId: 'group-123' },
+        telegramMessageTarget: { integrationId: 'telegram-1' },
+      },
+    };
+
+    const result = await sendMessageHandler(ctx);
+
+    expect(result.outcome).toBe('success');
+    expect(prismaMock.integration.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        id: 'telegram-1',
+        orgId: 'org-1',
+        type: 'telegram',
+        enabled: true,
+      },
+    }));
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.telegram.org/bottoken-1/sendMessage',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('Xin chao Anh A tu Zalo CRM'),
+      }),
     );
   });
 
@@ -335,5 +384,38 @@ describe('sendMessageHandler group target with template', () => {
       'Chuc mung sinh nhat',
     );
     expect(zaloOpsMock.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('mirrors rendered html template images to the selected Telegram integration', async () => {
+    const ctx: ActionContext = {
+      orgId: 'org-1',
+      taskId: 'task-1',
+      contactId: 'contact-1',
+      assignedNickId: 'nick-1',
+      actionType: 'send_message',
+      attemptCount: 0,
+      blockSnapshot: {
+        textVariants: ['Chuc mung {{contact.crmName}}'],
+        groupTarget: { accountId: 'nick-1', groupId: 'group-123' },
+        telegramMessageTarget: { integrationId: 'telegram-1' },
+        htmlImageTemplate: {
+          html: '<svg>{{contact.fullName}}</svg>',
+          width: 960,
+          height: 1280,
+          failOpen: false,
+        },
+      },
+    };
+
+    const result = await sendMessageHandler(ctx);
+
+    expect(result.outcome).toBe('success');
+    expect(fetch).toHaveBeenCalledWith(
+      'https://api.telegram.org/bottoken-1/sendPhoto',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.any(FormData),
+      }),
+    );
   });
 });

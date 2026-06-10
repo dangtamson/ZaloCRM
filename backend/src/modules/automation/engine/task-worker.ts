@@ -35,6 +35,7 @@ import type { SequenceStep } from '../sequences/types.js';
 import type { BlockActionType } from '../blocks/types.js';
 import { normalizeSendMessageTargets } from './send-message-targets.js';
 import { applySendMessageTargetOverrides } from './send-message-trigger-targets.js';
+import { notifyAutomationRunTelegram } from './automation-telegram-notifier.js';
 
 // ── Worker config ─────────────────────────────────────────────────────────
 
@@ -139,6 +140,7 @@ async function processTask(taskId: string): Promise<void> {
       campaign: {
         select: {
           id: true, state: true, sequenceId: true,
+          trigger: { select: { name: true } },
           rulesSnapshot: true,
           sequence: { select: { id: true, enabled: true, steps: true } },
         },
@@ -255,6 +257,7 @@ async function processTask(taskId: string): Promise<void> {
     });
     if (!nick) {
       await markFailed(taskId, 'NICK_MISSING', 'Assigned nick not found');
+      await notifyTaskFailure(task, actionType, 'NICK_MISSING: Assigned nick not found');
       return;
     }
 
@@ -321,6 +324,7 @@ async function processTask(taskId: string): Promise<void> {
   // fell through to retry+fail, burning quota on permanent failures.
   if (result.outcome === 'success') {
     await markDoneAndAdvance(task, result.data ?? null, assignedNickId, actionType, now);
+    await notifyTaskSuccess(task, actionType);
     return;
   }
 
@@ -334,6 +338,7 @@ async function processTask(taskId: string): Promise<void> {
     // Idempotent: friendship already exists. Treat as success for sequence advance,
     // but data records the dedup so analytics shows "skipped, already friend".
     await markDoneAndAdvance(task, { ...(result.data ?? {}), alreadyFriend: true }, assignedNickId, actionType, now);
+    await notifyTaskSuccess(task, actionType);
     return;
   }
 
@@ -345,7 +350,10 @@ async function processTask(taskId: string): Promise<void> {
     return;
   }
 
-  await markFailed(taskId, result.errorCode ?? 'ACTION_FAILED', result.errorMessage ?? 'Unknown failure', result.data ?? null);
+  const finalErrorCode = result.errorCode ?? 'ACTION_FAILED';
+  const finalErrorMessage = result.errorMessage ?? 'Unknown failure';
+  await markFailed(taskId, finalErrorCode, finalErrorMessage, result.data ?? null);
+  await notifyTaskFailure(task, actionType, `${finalErrorCode}: ${finalErrorMessage}`);
 }
 
 // ── State transitions ────────────────────────────────────────────────────
@@ -474,4 +482,60 @@ async function markDoneAndAdvance(
       state: TASK_STATES.QUEUED,
     },
   });
+}
+
+async function notifyTaskSuccess(
+  task: {
+    id: string;
+    orgId: string;
+    contactId: string;
+    campaignId: string;
+    campaign: { trigger?: { name: string } | null; rulesSnapshot?: unknown };
+  },
+  actionType: BlockActionType,
+): Promise<void> {
+  await notifyAutomationRunTelegram({
+    orgId: task.orgId,
+    status: 'success',
+    mode: 'worker',
+    taskId: task.id,
+    campaignId: task.campaignId,
+    contactId: task.contactId,
+    actionType,
+    triggerName: task.campaign.trigger?.name ?? null,
+    telegramIntegrationId: getTelegramNotificationIntegrationId(task.campaign.rulesSnapshot),
+  });
+}
+
+async function notifyTaskFailure(
+  task: {
+    id: string;
+    orgId: string;
+    contactId: string;
+    campaignId: string;
+    campaign: { trigger?: { name: string } | null; rulesSnapshot?: unknown };
+  },
+  actionType: BlockActionType,
+  errorMessage: string,
+): Promise<void> {
+  await notifyAutomationRunTelegram({
+    orgId: task.orgId,
+    status: 'failed',
+    mode: 'worker',
+    taskId: task.id,
+    campaignId: task.campaignId,
+    contactId: task.contactId,
+    actionType,
+    triggerName: task.campaign.trigger?.name ?? null,
+    telegramIntegrationId: getTelegramNotificationIntegrationId(task.campaign.rulesSnapshot),
+    errorMessage,
+  });
+}
+
+function getTelegramNotificationIntegrationId(ruleOverrides: unknown): string | null {
+  if (!ruleOverrides || typeof ruleOverrides !== 'object' || Array.isArray(ruleOverrides)) return null;
+  const notification = (ruleOverrides as Record<string, unknown>).telegramNotification;
+  if (!notification || typeof notification !== 'object' || Array.isArray(notification)) return null;
+  const integrationId = (notification as Record<string, unknown>).integrationId;
+  return typeof integrationId === 'string' && integrationId.trim() ? integrationId.trim() : null;
 }

@@ -11,6 +11,7 @@ const prismaMock = {
 const sendMessageHandlerMock = vi.fn();
 const eventEmitMock = vi.fn();
 const materializeFromEventMock = vi.fn();
+const notifyAutomationRunTelegramMock = vi.fn();
 
 vi.mock('../src/shared/database/prisma-client.js', () => ({ prisma: prismaMock }));
 vi.mock('../src/modules/auth/auth-middleware.js', () => ({
@@ -36,6 +37,9 @@ vi.mock('../src/modules/automation/engine/action-handlers/send-message.js', () =
 }));
 vi.mock('../src/modules/automation/engine/campaign-materializer.js', () => ({
   materializeFromEvent: materializeFromEventMock,
+}));
+vi.mock('../src/modules/automation/engine/automation-telegram-notifier.js', () => ({
+  notifyAutomationRunTelegram: notifyAutomationRunTelegramMock,
 }));
 
 const { triggerRoutes } = await import('../src/modules/automation/triggers/trigger-routes.js');
@@ -105,6 +109,14 @@ describe('POST /api/v1/automation/triggers/:id/run direct block test', () => {
       blockSnapshot: expect.objectContaining({
         groupTarget: { accountId: 'nick-1', groupId: 'group-1' },
       }),
+    }));
+    expect(notifyAutomationRunTelegramMock).toHaveBeenCalledWith(expect.objectContaining({
+      orgId: 'org-1',
+      status: 'success',
+      mode: 'manual',
+      taskId: 'manual-trigger-1',
+      actionType: 'send_message',
+      contactId: 'contact-sample-1',
     }));
     expect(eventEmitMock).not.toHaveBeenCalled();
   });
@@ -249,6 +261,51 @@ describe('POST /api/v1/automation/triggers/:id/run direct block test', () => {
     }));
   });
 
+  it('materializes birthday customer-list triggers immediately when send targets are configured', async () => {
+    prismaMock.automationTrigger.findFirst.mockResolvedValueOnce({
+      id: 'trigger-1',
+      name: 'Sinh nhật khách hàng',
+      eventType: 'birthday',
+      enabled: true,
+      bindingKind: 'block',
+      blockId: 'block-1',
+      eventFilter: null,
+      segmentSpec: { kind: 'customer-list', listId: 'list-1', birthdayToday: true },
+      ruleOverrides: {
+        sendMessageTargets: {
+          groupTargets: [{ accountId: 'nick-1', groupId: 'group-1' }],
+        },
+      },
+    });
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/automation/triggers/trigger-1/run',
+      payload: {},
+    });
+    await app.close();
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      accepted: true,
+      triggerId: 'trigger-1',
+      eventType: 'birthday',
+      mode: 'materialized',
+      materializeResult: {
+        campaignsCreated: 1,
+        tasksEnqueued: 1,
+      },
+    });
+    expect(sendMessageHandlerMock).not.toHaveBeenCalled();
+    expect(eventEmitMock).not.toHaveBeenCalled();
+    expect(materializeFromEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'birthday',
+      orgId: 'org-1',
+      payload: { triggerId: 'trigger-1' },
+    }));
+  });
+
   it('runs scheduled_cron customer-list trigger as a direct block test when contactId is provided but no send targets are configured', async () => {
     prismaMock.automationTrigger.findFirst.mockResolvedValueOnce({
       id: 'trigger-1',
@@ -332,5 +389,53 @@ describe('POST /api/v1/automation/triggers/:id/run direct block test', () => {
         reasons: ['trigger trigger-1: no contacts resolved (block-bound)'],
       },
     });
+  });
+
+  it('treats monitored birthday customer-list no-op runs as accepted', async () => {
+    prismaMock.automationTrigger.findFirst.mockResolvedValueOnce({
+      id: 'trigger-1',
+      name: 'Sinh nhật hôm nay',
+      eventType: 'scheduled_cron',
+      enabled: true,
+      bindingKind: 'block',
+      blockId: 'block-1',
+      eventFilter: { cron: '0 8 * * *' },
+      segmentSpec: { kind: 'customer-list', listId: 'list-1', birthdayToday: true },
+      ruleOverrides: {
+        telegramMessageTarget: { integrationId: 'telegram-1' },
+      },
+    });
+    materializeFromEventMock.mockResolvedValueOnce({
+      campaignsCreated: 0,
+      tasksEnqueued: 0,
+      noopSuccesses: 1,
+      skipped: 0,
+      reasons: [],
+    });
+
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/automation/triggers/trigger-1/run',
+      payload: {},
+    });
+    await app.close();
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({
+      accepted: true,
+      triggerId: 'trigger-1',
+      mode: 'materialized',
+      materializeResult: {
+        tasksEnqueued: 0,
+        noopSuccesses: 1,
+        reasons: [],
+      },
+    });
+    expect(res.json()).not.toHaveProperty('error');
+    expect(notifyAutomationRunTelegramMock).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'success',
+      errorMessage: null,
+    }));
   });
 });

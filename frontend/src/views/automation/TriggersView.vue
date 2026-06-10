@@ -300,6 +300,19 @@
           </div>
 
           <div v-if="draft.eventType === 'scheduled_cron'" class="form-field">
+            <label class="form-label">Gửi thêm nội dung qua Telegram</label>
+            <select v-model="triggerTelegramIntegrationId" class="at-input">
+              <option value="">Không gửi qua Telegram</option>
+              <option v-for="item in telegramIntegrationItems" :key="item.value" :value="item.value">
+                {{ item.title }}
+              </option>
+            </select>
+            <p class="at-caption form-hint">
+              Khi block gửi tin qua Zalo, hệ thống cũng gửi cùng text/ảnh đã render sang Telegram Bot đã chọn.
+            </p>
+          </div>
+
+          <div v-if="['scheduled_cron', 'birthday'].includes(draft.eventType)" class="form-field">
             <label class="form-label">Audience theo tệp người dùng (optional)</label>
             <select v-model="segmentKind" class="at-input">
               <option value="none">Không dùng customer-list</option>
@@ -319,6 +332,10 @@
               <label class="form-toggle">
                 <input type="checkbox" v-model="segmentBirthdayThisWeek" />
                 <span>Chỉ lấy người có sinh nhật trong tuần hiện tại</span>
+              </label>
+              <label class="form-toggle">
+                <input type="checkbox" v-model="segmentBirthdayToday" />
+                <span>Chỉ lấy người có sinh nhật trong ngày hôm nay từ tệp người dùng</span>
               </label>
             </template>
           </div>
@@ -347,7 +364,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { api } from '@/api/index';
 import { triggersApi, sequencesApi, blocksApi } from '@/api/automation';
 import type {
@@ -369,6 +386,12 @@ const customerListOptions = ref<Array<{
   iconEmoji: string | null;
   totalEntries: number;
   validEntries: number;
+}>>([]);
+const integrations = ref<Array<{
+  id: string;
+  type: string;
+  name: string;
+  enabled: boolean;
 }>>([]);
 const {
   accounts: zaloAccounts,
@@ -419,10 +442,12 @@ const draft = ref<Draft | null>(null);
 const segmentKind = ref<'none' | 'customer-list'>('none');
 const segmentCustomerListId = ref('');
 const segmentBirthdayThisWeek = ref(false);
+const segmentBirthdayToday = ref(false);
 const triggerGroupTargetsEnabled = ref(false);
 const triggerUserTargetsEnabled = ref(false);
 const triggerGroupTargets = ref<Array<{ accountId: string; groupId: string }>>([{ accountId: '', groupId: '' }]);
 const triggerUserTargets = ref<Array<{ accountId: string; contactId: string }>>([{ accountId: '', contactId: '' }]);
+const triggerTelegramIntegrationId = ref('');
 const triggerRuleOverridesBase = ref<Record<string, unknown>>({});
 
 const availableCategories = computed(() => {
@@ -458,6 +483,14 @@ const sequenceOptions = computed(() =>
 const blockOptions = computed(() =>
   blocks.value.filter((b) => !b.archivedAt).map((b) => ({ value: b.id, title: b.name })),
 );
+
+watch(segmentBirthdayToday, (enabled) => {
+  if (enabled) segmentBirthdayThisWeek.value = false;
+});
+
+watch(segmentBirthdayThisWeek, (enabled) => {
+  if (enabled) segmentBirthdayToday.value = false;
+});
 const draftBlock = computed(() => {
   if (!draft.value?.blockId) return null;
   return blocks.value.find((b) => b.id === draft.value?.blockId) ?? null;
@@ -490,6 +523,21 @@ const triggerUserContactItems = computed(() => {
   }
   return items;
 });
+const telegramIntegrationItems = computed(() => {
+  const items = integrations.value
+    .filter((integration) => integration.type === 'telegram' && integration.enabled)
+    .map((integration) => ({
+      title: integration.name || integration.id,
+      value: integration.id,
+    }));
+  if (
+    triggerTelegramIntegrationId.value
+    && !items.some((item) => item.value === triggerTelegramIntegrationId.value)
+  ) {
+    items.push({ title: `${triggerTelegramIntegrationId.value} (đã lưu)`, value: triggerTelegramIntegrationId.value });
+  }
+  return items;
+});
 
 function bindingLabel(b: TriggerBindingKind): string {
   return { sequence: 'Sequence', block: 'Block', broadcast: 'Broadcast' }[b];
@@ -498,12 +546,13 @@ function bindingLabel(b: TriggerBindingKind): string {
 async function loadAll() {
   loading.value = true;
   try {
-    const [cat, conf, seqs, blks, listsRes] = await Promise.all([
+    const [cat, conf, seqs, blks, listsRes, integrationsRes] = await Promise.all([
       triggersApi.listTriggerCatalog(),
       triggersApi.listTriggers(),
       sequencesApi.listSequences(),
       blocksApi.listBlocks({ limit: 500 }),
       api.get('/customer-lists', { params: { status: 'active', limit: 100 } }),
+      api.get('/integrations'),
       fetchAccounts(),
       fetchGroupContacts(),
       fetchUserContacts(),
@@ -513,6 +562,7 @@ async function loadAll() {
     sequences.value = seqs;
     blocks.value = blks;
     customerListOptions.value = listsRes.data?.lists ?? [];
+    integrations.value = Array.isArray(integrationsRes.data) ? integrationsRes.data : [];
   } finally {
     loading.value = false;
   }
@@ -537,7 +587,9 @@ function openCreateFromCatalog(entry: TriggerCatalogEntry) {
   segmentKind.value = 'none';
   segmentCustomerListId.value = '';
   segmentBirthdayThisWeek.value = false;
+  segmentBirthdayToday.value = false;
   triggerRuleOverridesBase.value = {};
+  triggerTelegramIntegrationId.value = '';
   resetTriggerTargets();
   editorOpen.value = true;
 }
@@ -560,12 +612,15 @@ function openEdit(trig: AutomationTrigger) {
     segmentKind.value = 'customer-list';
     segmentCustomerListId.value = seg.listId;
     segmentBirthdayThisWeek.value = seg.birthdayThisWeek === true;
+    segmentBirthdayToday.value = seg.birthdayToday === true;
   } else {
     segmentKind.value = 'none';
     segmentCustomerListId.value = '';
     segmentBirthdayThisWeek.value = false;
+    segmentBirthdayToday.value = false;
   }
   readTriggerTargetsFromRuleOverrides(trig.ruleOverrides);
+  readTelegramNotificationFromRuleOverrides(trig.ruleOverrides);
   error.value = '';
   editorOpen.value = true;
 }
@@ -648,6 +703,8 @@ function readTriggerTargetsFromRuleOverrides(ruleOverrides: Record<string, unkno
   const base = ruleOverrides && typeof ruleOverrides === 'object' ? { ...ruleOverrides } : {};
   const targets = base.sendMessageTargets;
   delete base.sendMessageTargets;
+  delete base.telegramMessageTarget;
+  delete base.telegramNotification;
   triggerRuleOverridesBase.value = base;
   const groupTargets = readGroupTargets(targets);
   const userTargets = readUserTargets(targets);
@@ -657,8 +714,27 @@ function readTriggerTargetsFromRuleOverrides(ruleOverrides: Record<string, unkno
   triggerUserTargetsEnabled.value = userTargets.length > 0;
 }
 
+function readTelegramNotificationFromRuleOverrides(ruleOverrides: Record<string, unknown> | null) {
+  if (!ruleOverrides || typeof ruleOverrides !== 'object') {
+    triggerTelegramIntegrationId.value = '';
+    return;
+  }
+  const target = ruleOverrides.telegramMessageTarget ?? ruleOverrides.telegramNotification;
+  if (!target || typeof target !== 'object' || Array.isArray(target)) {
+    triggerTelegramIntegrationId.value = '';
+    return;
+  }
+  const integrationId = (target as Record<string, unknown>).integrationId;
+  triggerTelegramIntegrationId.value = typeof integrationId === 'string' ? integrationId : '';
+}
+
 function buildRuleOverridesPayload() {
   const out: Record<string, unknown> = { ...triggerRuleOverridesBase.value };
+  if (draft.value?.eventType === 'scheduled_cron' && triggerTelegramIntegrationId.value.trim()) {
+    out.telegramMessageTarget = { integrationId: triggerTelegramIntegrationId.value.trim() };
+  } else {
+    delete out.telegramMessageTarget;
+  }
   if (!showSendMessageTargetsConfig.value) {
     delete out.sendMessageTargets;
     return out;
@@ -731,8 +807,10 @@ async function saveTrigger() {
       enabled: draft.value.enabled,
     };
     // Pack cron into eventFilter (backend cron-event-scheduler reads from here)
-    if (draft.value.eventType === 'scheduled_cron') {
-      payload.eventFilter = { cron: draft.value.cronExpr.trim() };
+    if (draft.value.eventType === 'scheduled_cron' || draft.value.eventType === 'birthday') {
+      if (draft.value.eventType === 'scheduled_cron') {
+        payload.eventFilter = { cron: draft.value.cronExpr.trim() };
+      }
       if (segmentKind.value === 'customer-list') {
         if (!segmentCustomerListId.value.trim()) {
           error.value = 'Cần CustomerList ID khi dùng customer-list';
@@ -742,7 +820,8 @@ async function saveTrigger() {
         payload.segmentSpec = {
           kind: 'customer-list',
           listId: segmentCustomerListId.value.trim(),
-          ...(segmentBirthdayThisWeek.value ? { birthdayThisWeek: true } : {}),
+          ...(segmentBirthdayToday.value ? { birthdayToday: true } : {}),
+          ...(!segmentBirthdayToday.value && segmentBirthdayThisWeek.value ? { birthdayThisWeek: true } : {}),
         };
       } else {
         payload.segmentSpec = null;
@@ -789,11 +868,14 @@ async function onManualRun(trig: AutomationTrigger) {
     }
     if (result.mode === 'materialized') {
       const tasks = result.materializeResult?.tasksEnqueued ?? 0;
+      const noopSuccesses = result.materializeResult?.noopSuccesses ?? 0;
       showToast(
         tasks > 0
           ? `Đã tạo ${tasks} task để worker xử lý.`
-          : 'Không tạo được task mới.',
-        tasks > 0 ? 'success' : 'error',
+          : noopSuccesses > 0
+            ? 'Trigger đã chạy, không có người nào thỏa điều kiện.'
+            : 'Không tạo được task mới.',
+        tasks > 0 || noopSuccesses > 0 ? 'success' : 'error',
       );
       return;
     }

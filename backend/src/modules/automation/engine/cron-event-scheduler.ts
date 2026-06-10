@@ -164,6 +164,28 @@ async function fireBirthdayEvents(): Promise<void> {
     const month = vnNow.getMonth() + 1; // 1-12
     const day = vnNow.getDate();         // 1-31
 
+    const customerListBirthdayTriggers = await prisma.automationTrigger.findMany({
+      where: {
+        eventType: 'birthday',
+        enabled: true,
+        segmentSpec: { path: ['kind'], equals: 'customer-list' },
+      },
+      select: { id: true, orgId: true },
+    });
+    for (const trigger of customerListBirthdayTriggers) {
+      automationEventBus.emit({
+        type: 'birthday',
+        orgId: trigger.orgId,
+        occurredAt: new Date(),
+        payload: {
+          triggerId: trigger.id,
+          month,
+          day,
+          source: 'customer-list',
+        },
+      });
+    }
+
     const contacts = await prisma.$queryRaw<Array<{ id: string; org_id: string; birth_date: Date }>>`
       SELECT id, org_id, birth_date
       FROM contacts

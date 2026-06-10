@@ -62,7 +62,7 @@ export async function aiRoutes(app: FastifyInstance) {
 
   app.put('/api/v1/ai/config', { preHandler: requireRole('owner', 'admin') }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const body = request.body as { provider?: string; model?: string; maxDaily?: number; enabled?: boolean };
+      const body = request.body as { provider?: string; model?: string; maxDaily?: number; enabled?: boolean; apiKey?: string; baseUrl?: string };
       if (body.maxDaily !== undefined && body.maxDaily < 1) return reply.status(400).send({ error: 'maxDaily must be at least 1' });
       return await updateAiConfig(request.user!.orgId, body);
     } catch (err) {

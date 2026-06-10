@@ -315,6 +315,7 @@ const htmlTemplatePreset = ref('');
 const htmlPreviewEnabled = ref(false);
 const htmlTemplateEditorExpanded = ref(false);
 const BIRTHDAY_CARD_BACKGROUND_HREF = '/automation-assets/image/hpbd.png';
+const BIRTHDAY_CARD_KDGP_BACKGROUND_HREF = '/automation-assets/image/hpbdkdgp.png';
 const BIRTHDAY_VNPT_SVG_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1280" viewBox="0 0 960 1280">
   <defs>
     <style>
@@ -344,6 +345,34 @@ const BIRTHDAY_VNPT_SVG_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg" widt
     <tspan x="557" dy="38">{{contact.birthdayWishLine5}}</tspan>
   </text>
 </svg>`;
+const BIRTHDAY_VNPT_KDGP_SVG_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1280" viewBox="0 0 960 1280">
+  <defs>
+    <style>
+      .serif { font-family: 'Times New Roman', Georgia, serif; }
+      .script { font-family: 'Brush Script MT', 'Segoe Script', cursive; font-style: italic; }
+      .name { fill: #0156d0; font-size: 90px; font-weight: 700; letter-spacing: 0.5px; }
+      .unit { fill: #f6c86b; font-size: 40px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+      .dob { fill: #06184a; font-size: 46px; font-weight: 700; letter-spacing: 6px; }
+      .message { fill: #071d63; font-size: 24px; font-style: italic; }
+    </style>
+  </defs>
+  <image href="${BIRTHDAY_CARD_KDGP_BACKGROUND_HREF}" x="0" y="0" width="960" height="1280" preserveAspectRatio="none"/>
+
+  <rect x="210" y="518" width="540" height="98" rx="18" fill="#06184f" opacity="0"/>
+  <rect x="258" y="663" width="444" height="104" rx="18" fill="#f6e9de" opacity="0"/>
+  <rect x="270" y="792" width="420" height="175" fill="#ffffff" opacity="0"/>
+
+  <text x="450" y="450" text-anchor="middle" class="script name">{{contact.salutation}} {{contact.fullName}}</text>
+  <text x="480" y="550" text-anchor="middle" class="serif unit">{{contact.occupation}}</text>
+  <text x="530" y="720" text-anchor="middle" class="serif dob">{{contact.birthDate}}</text>
+  <text x="490" y="780" text-anchor="middle" class="serif message">
+    <tspan x="490" dy="0">{{contact.birthdayWishLine1}}</tspan>
+    <tspan x="490" dy="36">{{contact.birthdayWishLine2}}</tspan>
+    <tspan x="490" dy="36">{{contact.birthdayWishLine3}}</tspan>
+    <tspan x="490" dy="36">{{contact.birthdayWishLine4}}</tspan>
+    <tspan x="490" dy="36">{{contact.birthdayWishLine5}}</tspan>
+  </text>
+</svg>`;
 const HTML_TEMPLATE_PRESETS = [
   {
     value: 'vnpt_birthday_blue_gold',
@@ -351,6 +380,13 @@ const HTML_TEMPLATE_PRESETS = [
     width: 960,
     height: 1280,
     html: BIRTHDAY_VNPT_SVG_TEMPLATE,
+  },
+  {
+    value: 'vnpt_birthday_kdgp_blue_gold',
+    label: 'Sinh nhật VNPT Mẫu 2',
+    width: 960,
+    height: 1280,
+    html: BIRTHDAY_VNPT_KDGP_SVG_TEMPLATE,
   },
 ] as const;
 const DEFAULT_HTML_TEMPLATE_PRESET = 'vnpt_birthday_blue_gold';
@@ -483,21 +519,24 @@ function normalizeTemplateSource(html: string) {
 
 function renderTemplatePreview(template: string) {
   if (!template.trim()) return '';
+  const previewGender = 'male';
+  const previewSalutation = salutationFromGender(previewGender);
+  const previewUnit = 'VNPT CẦN THƠ';
   const replacements: Record<string, string> = {
-    'contact.salutation': 'Anh',
+    'contact.salutation': previewSalutation,
     'contact.fullName': 'Nguyễn Văn A',
-    'contact.crmName': 'Anh Nguyễn Văn A',
+    'contact.crmName': `${previewSalutation} Nguyễn Văn A`,
     'contact.birthDate': '01/01/1900',
-    'contact.gender': 'Nam',
+    'contact.gender': previewGender,
     'contact.occupation': 'N/A',
-    'contact.unit': 'VNPT CẦN THƠ',
-    'contact.birthdayWish': 'Nhân dịp sinh nhật của {{contact.salutation}}, kính chúc {{contact.salutation}} luôn dồi dào sức khỏe, hạnh phúc, thành công.',
-    'contact.birthdayWishLine1': 'Nhân dịp sinh nhật của {{contact.salutation}}, kính chúc {{contact.salutation}} luôn',
+    'contact.unit': previewUnit,
+    'contact.birthdayWish': `Nhân dịp sinh nhật của ${previewSalutation}, kính chúc ${previewSalutation} luôn dồi dào sức khỏe, hạnh phúc, thành công.`,
+    'contact.birthdayWishLine1': `Nhân dịp sinh nhật của ${previewSalutation}, kính chúc ${previewSalutation} luôn`,
     'contact.birthdayWishLine2': 'dồi dào sức khỏe, hạnh phúc, thành công và tiếp tục',
-    'contact.birthdayWishLine3': 'đồng hành với VNPT CẦN THƠ phát triển vững mạnh,',
+    'contact.birthdayWishLine3': `đồng hành với ${previewUnit} phát triển vững mạnh,`,
     'contact.birthdayWishLine4': 'hoàn thành xuất sắc mọi nhiệm vụ, đóng góp tích cực',
     'contact.birthdayWishLine5': 'vào sự phát triển chung của VNPT.',
-    'org.name': 'VNPT CẦN THƠ',
+    'org.name': previewUnit,
     'date.today': '01/01/1900',
   };
   const rendered = normalizePreviewAssetUrls(
@@ -534,6 +573,13 @@ function renderTemplatePreview(template: string) {
 </head>
 <body>${rendered}</body>
 </html>`;
+}
+
+function salutationFromGender(gender: string) {
+  const value = gender.trim().toLowerCase();
+  if (value === 'male' || value === 'nam') return 'Anh';
+  if (value === 'female' || value === 'nu' || value === 'nữ') return 'Chị';
+  return 'Bạn';
 }
 
 function normalizePreviewAssetUrls(markup: string) {

@@ -32,14 +32,24 @@ import { renderHtmlTemplateToImage } from '../html-image-template.js';
 import { normalizeSendMessageTargets, type SendMessageTarget } from '../send-message-targets.js';
 import { resolveZaloAccountId } from '../zalo-account-resolution.js';
 import { SEND_MESSAGE_TARGET_DELAY_MS, sleep } from '../send-message-delay.js';
+import { sendTelegramPhoto, sendTelegramText, type TelegramConfig } from '../../../integrations/providers/telegram-bot.js';
 
 const STUB_MODE = process.env.AUTOMATION_STUB_MODE === 'true';
+
+type MessageAttachmentSnapshot = {
+  kind: string;
+  url: string;
+  caption?: string;
+  thumbnailUrl?: string;
+  altText?: string;
+  filePath?: string;
+};
 
 async function executeBatchTargets(
   ctx: ActionContext,
   snap: {
     textVariants?: string[];
-    attachments?: Array<{ kind: string; url: string; caption?: string; thumbnailUrl?: string; altText?: string; filePath?: string }>;
+    attachments?: MessageAttachmentSnapshot[];
     aiImagePrompt?: AiImagePrompt;
     groupTarget?: { accountId?: string; groupId?: string };
     groupTargets?: Array<{ accountId?: string; groupId?: string }>;
@@ -221,11 +231,12 @@ function buildTemplateContact(
 export async function sendMessageHandler(ctx: ActionContext): Promise<ActionResult> {
   const snap = ctx.blockSnapshot as {
     textVariants?: string[];
-    attachments?: Array<{ kind: string; url: string; caption?: string; thumbnailUrl?: string; altText?: string; filePath?: string }>;
+    attachments?: MessageAttachmentSnapshot[];
     aiImagePrompt?: AiImagePrompt;
     groupTarget?: { accountId?: string; groupId?: string };
     htmlImageTemplate?: { html?: string; width?: number; height?: number; failOpen?: boolean };
     __recipientContactId?: string;
+    telegramMessageTarget?: { integrationId?: string };
     __templateContactOverride?: Record<string, unknown>;
     __templateContactOverrides?: Array<Record<string, unknown>>;
   };
@@ -288,7 +299,7 @@ export async function sendMessageHandler(ctx: ActionContext): Promise<ActionResu
   });
   // Clone the static attachment list — we may prepend an AI-generated image
   // below without mutating the frozen snapshot.
-  const attachments: Array<{ kind: string; url: string; caption?: string; thumbnailUrl?: string; altText?: string; filePath?: string }> =
+  const attachments: MessageAttachmentSnapshot[] =
     Array.isArray(snap.attachments) ? [...snap.attachments] : [];
 
   if (STUB_MODE) {
@@ -532,6 +543,8 @@ export async function sendMessageHandler(ctx: ActionContext): Promise<ActionResu
     });
   }
 
+  await mirrorRenderedMessageToTelegram(ctx.orgId, snap.telegramMessageTarget, text, attachments);
+
   // Step 4: extract zaloMsgId for dedup with self-listen echo
   const sr = sdkResult as { message?: { msgId?: number | string } | null; msgId?: number | string };
   const rawId = sr?.message?.msgId ?? sr?.msgId ?? '';
@@ -605,4 +618,54 @@ export async function sendMessageHandler(ctx: ActionContext): Promise<ActionResu
       messageId: messageRow.id,
     },
   };
+}
+
+async function mirrorRenderedMessageToTelegram(
+  orgId: string,
+  target: { integrationId?: string } | undefined,
+  text: string,
+  attachments: MessageAttachmentSnapshot[],
+): Promise<void> {
+  const integrationId = typeof target?.integrationId === 'string' ? target.integrationId.trim() : '';
+  if (!integrationId) return;
+
+  try {
+    const integration = await prisma.integration.findFirst({
+      where: {
+        id: integrationId,
+        orgId,
+        type: 'telegram',
+        enabled: true,
+      },
+      select: { id: true, config: true },
+    });
+    if (!integration) {
+      logger.warn(`[send-message] telegram mirror skipped: integration ${integrationId} not found or disabled`);
+      return;
+    }
+
+    const config = integration.config as TelegramConfig;
+    const imageAttachments = attachments.filter((item) => item.kind === 'image' && (item.url || item.filePath));
+    if (imageAttachments.length === 0) {
+      const result = await sendTelegramText(config, text);
+      if (result.status !== 'success') {
+        logger.warn(`[send-message] telegram text mirror failed for integration ${integration.id}: ${result.errorMessage}`);
+      }
+      return;
+    }
+
+    for (let i = 0; i < imageAttachments.length; i += 1) {
+      const image = imageAttachments[i];
+      const result = await sendTelegramPhoto(config, {
+        url: image.url,
+        filePath: image.filePath,
+        caption: i === 0 ? (image.caption || text) : undefined,
+      });
+      if (result.status !== 'success') {
+        logger.warn(`[send-message] telegram photo mirror failed for integration ${integration.id}: ${result.errorMessage}`);
+      }
+    }
+  } catch (error) {
+    logger.warn('[send-message] telegram mirror failed:', error);
+  }
 }

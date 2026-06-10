@@ -87,6 +87,7 @@ export async function runTrigger(id: string, input: ManualRunInput = {}): Promis
   materializeResult?: {
     campaignsCreated: number;
     tasksEnqueued: number;
+    noopSuccesses?: number;
     skipped: number;
     reasons: string[];
   };

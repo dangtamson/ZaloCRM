@@ -29,6 +29,10 @@ export interface AiConfig {
   enabled: boolean;
   hasAnthropicKey?: boolean;
   hasGeminiKey?: boolean;
+  hasOpenaiKey?: boolean;
+  hasOpenapiKey?: boolean;
+  providerBaseUrl?: string;
+  providerApiKeyConfigured?: boolean;
 }
 
 interface ConversationMessage {
@@ -423,6 +427,10 @@ export function useChat() {
         enabled: res.data.enabled,
         hasAnthropicKey: res.data.hasAnthropicKey,
         hasGeminiKey: res.data.hasGeminiKey,
+        hasOpenaiKey: res.data.hasOpenaiKey,
+        hasOpenapiKey: res.data.hasOpenapiKey,
+        providerBaseUrl: res.data.providerBaseUrl,
+        providerApiKeyConfigured: res.data.providerApiKeyConfigured,
       };
     } catch (err) {
       console.error('Failed to fetch AI config:', err);
@@ -435,10 +443,14 @@ export function useChat() {
       provider: res.data.provider,
       model: res.data.model,
       maxDaily: res.data.maxDaily,
-      enabled: res.data.enabled,
-      hasAnthropicKey: aiConfig.value.hasAnthropicKey,
-      hasGeminiKey: aiConfig.value.hasGeminiKey,
-    };
+        enabled: res.data.enabled,
+        hasAnthropicKey: aiConfig.value.hasAnthropicKey,
+        hasGeminiKey: aiConfig.value.hasGeminiKey,
+        hasOpenaiKey: aiConfig.value.hasOpenaiKey,
+        hasOpenapiKey: aiConfig.value.hasOpenapiKey,
+        providerBaseUrl: res.data.providerBaseUrl,
+        providerApiKeyConfigured: res.data.providerApiKeyConfigured,
+      };
   }
 
   async function fetchAiUsage() {

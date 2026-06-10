@@ -34,6 +34,7 @@ import { registerCronTrigger, unregisterCronTrigger } from '../engine/cron-event
 import { sendMessageHandler } from '../engine/action-handlers/send-message.js';
 import { hasExplicitSendMessageTargets } from '../engine/send-message-targets.js';
 import { applySendMessageTargetOverrides } from '../engine/send-message-trigger-targets.js';
+import { notifyAutomationRunTelegram } from '../engine/automation-telegram-notifier.js';
 
 const BASE = '/api/v1/automation/triggers';
 
@@ -253,6 +254,7 @@ export async function triggerRoutes(app: FastifyInstance): Promise<void> {
         where: { id, orgId: user.orgId },
         select: {
           id: true,
+          name: true,
           eventType: true,
           enabled: true,
           bindingKind: true,
@@ -268,7 +270,7 @@ export async function triggerRoutes(app: FastifyInstance): Promise<void> {
       const manualContactId = typeof body.contactId === 'string' && body.contactId.trim()
         ? body.contactId.trim()
         : undefined;
-      const materializesScheduledCustomerList = shouldMaterializeScheduledCronCustomerList(trigger);
+      const materializesCustomerListTrigger = shouldMaterializeCustomerListTrigger(trigger);
 
       if (trigger.bindingKind === 'block' && trigger.blockId) {
         const block = await prisma.block.findFirst({
@@ -279,7 +281,7 @@ export async function triggerRoutes(app: FastifyInstance): Promise<void> {
           ? applySendMessageTargetOverrides(block.content, trigger.ruleOverrides)
           : undefined;
         const hasSendTargets = Boolean(blockSnapshot && hasExplicitSendMessageTargets(blockSnapshot));
-        const shouldRunDirectBlockTest = materializesScheduledCustomerList
+        const shouldRunDirectBlockTest = materializesCustomerListTrigger
           ? Boolean(manualContactId && !hasSendTargets)
           : hasSendTargets;
         if (
@@ -303,6 +305,19 @@ export async function triggerRoutes(app: FastifyInstance): Promise<void> {
             blockSnapshot,
             actionType: 'send_message',
             attemptCount: 0,
+          });
+          await notifyAutomationRunTelegram({
+            orgId: user.orgId,
+            status: actionResult.outcome === 'success' ? 'success' : 'failed',
+            mode: 'manual',
+            taskId: `manual-${trigger.id}`,
+            triggerName: trigger.name,
+            actionType: 'send_message',
+            contactId: sampleContact?.id ?? null,
+            telegramIntegrationId: getTelegramNotificationIntegrationId(trigger.ruleOverrides),
+            errorMessage: actionResult.outcome === 'success'
+              ? null
+              : (actionResult.errorMessage || actionResult.errorCode || actionResult.outcome),
           });
 
           return reply.status(200).send({
@@ -328,9 +343,20 @@ export async function triggerRoutes(app: FastifyInstance): Promise<void> {
         payload: buildManualRunPayload(trigger, body.payload),
       };
 
-      if (materializesScheduledCustomerList) {
+      if (materializesCustomerListTrigger) {
         const materializeResult = await materializeFromEvent(event);
-        const accepted = materializeResult.tasksEnqueued > 0;
+        const accepted = materializeResult.tasksEnqueued > 0 || materializeResult.noopSuccesses > 0;
+        await notifyAutomationRunTelegram({
+          orgId: user.orgId,
+          status: accepted ? 'success' : 'failed',
+          mode: 'manual',
+          triggerName: trigger.name,
+          actionType: 'materialize',
+          telegramIntegrationId: getTelegramNotificationIntegrationId(trigger.ruleOverrides),
+          errorMessage: accepted
+            ? null
+            : (materializeResult.reasons.filter(Boolean).join('; ') || 'No automation tasks were created'),
+        });
         return reply.status(accepted ? 200 : 409).send({
           accepted,
           triggerId: id,
@@ -387,13 +413,18 @@ export async function triggerRoutes(app: FastifyInstance): Promise<void> {
   });
 }
 
-function shouldMaterializeScheduledCronCustomerList(trigger: {
+function shouldMaterializeCustomerListTrigger(trigger: {
   eventType: string;
   segmentSpec?: unknown;
 }): boolean {
-  if (trigger.eventType !== 'scheduled_cron') return false;
+  if (trigger.eventType !== 'scheduled_cron' && trigger.eventType !== 'birthday') return false;
   const spec = trigger.segmentSpec;
-  return Boolean(spec && typeof spec === 'object' && (spec as Record<string, unknown>).kind === 'customer-list');
+  return Boolean(
+    spec
+      && typeof spec === 'object'
+      && !Array.isArray(spec)
+      && (spec as Record<string, unknown>).kind === 'customer-list',
+  );
 }
 
 function buildManualRunPayload(
@@ -401,7 +432,7 @@ function buildManualRunPayload(
   explicitPayload: unknown,
 ): unknown {
   if (explicitPayload !== undefined) return explicitPayload;
-  if (trigger.eventType !== 'scheduled_cron') return undefined;
+  if (trigger.eventType !== 'scheduled_cron' && trigger.eventType !== 'birthday') return undefined;
   const filter = trigger.eventFilter && typeof trigger.eventFilter === 'object'
     ? trigger.eventFilter as Record<string, unknown>
     : {};
@@ -409,6 +440,14 @@ function buildManualRunPayload(
     triggerId: trigger.id,
     ...(typeof filter.cron === 'string' ? { cron: filter.cron } : {}),
   };
+}
+
+function getTelegramNotificationIntegrationId(ruleOverrides: unknown): string | null {
+  if (!ruleOverrides || typeof ruleOverrides !== 'object' || Array.isArray(ruleOverrides)) return null;
+  const notification = (ruleOverrides as Record<string, unknown>).telegramNotification;
+  if (!notification || typeof notification !== 'object' || Array.isArray(notification)) return null;
+  const integrationId = (notification as Record<string, unknown>).integrationId;
+  return typeof integrationId === 'string' && integrationId.trim() ? integrationId.trim() : null;
 }
 
 async function toggleEnabled(request: FastifyRequest, reply: FastifyReply, enabled: boolean) {

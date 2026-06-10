@@ -78,6 +78,14 @@ export const config = {
   openaiDefaultGpt4oModel: envValue('OPENAI_DEFAULT_GPT4O_MODEL') || '',
   openaiDefaultGpt4oMiniModel: envValue('OPENAI_DEFAULT_GPT4O_MINI_MODEL') || '',
 
+  openapiBaseUrl: envValue('OPENAPI_BASE_URL') || '',
+  openapiAuthToken: envValue('OPENAPI_AUTH_TOKEN') || envValue('OPENAPI_API_KEY') || '',
+  openapiDefaultModel: envValue('OPENAPI_DEFAULT_MODEL') || '',
+
+  ollamaBaseUrl: envValue('OLLAMA_BASE_URL') || 'http://localhost:11434/v1',
+  ollamaAuthToken: envValue('OLLAMA_AUTH_TOKEN') || '',
+  ollamaDefaultModel: envValue('OLLAMA_DEFAULT_MODEL') || 'llama3.1',
+
   qwenBaseUrl: envValue('QWEN_BASE_URL') || 'https://dashscope.aliyuncs.com',
   qwenAuthToken: envValue('QWEN_AUTH_TOKEN') || '',
   qwenDefaultPlusModel: envValue('QWEN_DEFAULT_PLUS_MODEL') || '',

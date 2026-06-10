@@ -36,15 +36,33 @@ function buildConversationContext(messages: MessageContext[]) {
 }
 
 async function getProviderApiKey(orgId: string, provider: string) {
-  /* 1. Check registry (env-based) */
-  const providerDef = getProviderConfig(provider);
-  if (providerDef?.authToken) return providerDef.authToken;
-
-  /* 2. Fallback: per-org DB setting */
   const setting = await prisma.appSetting.findFirst({
     where: { orgId, settingKey: `ai_${provider}_api_key` },
   });
-  return setting?.valuePlain || '';
+  if (setting?.valuePlain) return setting.valuePlain;
+
+  const providerDef = getProviderConfig(provider);
+  if (providerDef?.authToken) return providerDef.authToken;
+  if (providerDef && !providerDef.authRequired) return providerDef.authToken || 'ollama-local';
+  return '';
+}
+
+async function getProviderBaseUrl(orgId: string, provider: string) {
+  const setting = await prisma.appSetting.findFirst({
+    where: { orgId, settingKey: `ai_${provider}_base_url` },
+  });
+  if (setting?.valuePlain) return setting.valuePlain.replace(/\/$/, '');
+
+  const providerDef = getProviderConfig(provider);
+  return (providerDef?.baseUrl || '').replace(/\/$/, '');
+}
+
+async function upsertPlainSetting(orgId: string, settingKey: string, valuePlain: string) {
+  return prisma.appSetting.upsert({
+    where: { orgId_settingKey: { orgId, settingKey } },
+    create: { orgId, settingKey, valuePlain },
+    update: { valuePlain },
+  });
 }
 
 export async function getAiConfig(orgId: string) {
@@ -55,13 +73,41 @@ export async function getAiConfig(orgId: string) {
     });
   }
   const availableProviders = getAvailableProviders();
+  const providerApiKeySetting = await prisma.appSetting.findFirst({
+    where: { orgId, settingKey: `ai_${aiConfig.provider}_api_key` },
+  });
+  const providerBaseUrl = await getProviderBaseUrl(orgId, aiConfig.provider);
   const hasKey = async (p: string) => !!(await getProviderApiKey(orgId, p));
-  const [hasAnthropicKey, hasGeminiKey] = await Promise.all([hasKey('anthropic'), hasKey('gemini')]);
-  return { ...aiConfig, hasAnthropicKey, hasGeminiKey, availableProviders };
+  const [hasAnthropicKey, hasGeminiKey, hasOpenaiKey, hasOpenapiKey] = await Promise.all([
+    hasKey('anthropic'),
+    hasKey('gemini'),
+    hasKey('openai'),
+    hasKey('openapi'),
+  ]);
+  return {
+    ...aiConfig,
+    hasAnthropicKey,
+    hasGeminiKey,
+    hasOpenaiKey,
+    hasOpenapiKey,
+    providerBaseUrl,
+    providerApiKeyConfigured: Boolean(providerApiKeySetting?.valuePlain || (getProviderConfig(aiConfig.provider)?.authToken)),
+    availableProviders,
+  };
 }
 
-export async function updateAiConfig(orgId: string, input: { provider?: string; model?: string; maxDaily?: number; enabled?: boolean }) {
-  return prisma.aiConfig.upsert({
+export async function updateAiConfig(orgId: string, input: { provider?: string; model?: string; maxDaily?: number; enabled?: boolean; apiKey?: string; baseUrl?: string }) {
+  const selectedProvider = input.provider || config.aiDefaultProvider;
+  const updates: Promise<unknown>[] = [];
+  if (input.apiKey !== undefined) {
+    updates.push(upsertPlainSetting(orgId, `ai_${selectedProvider}_api_key`, input.apiKey.trim()));
+  }
+  if (input.baseUrl !== undefined) {
+    updates.push(upsertPlainSetting(orgId, `ai_${selectedProvider}_base_url`, input.baseUrl.trim().replace(/\/$/, '')));
+  }
+  if (updates.length > 0) await Promise.all(updates);
+
+  await prisma.aiConfig.upsert({
     where: { orgId },
     create: {
       orgId,
@@ -77,6 +123,7 @@ export async function updateAiConfig(orgId: string, input: { provider?: string; 
       enabled: input.enabled,
     },
   });
+  return getAiConfig(orgId);
 }
 
 export async function getAiUsage(orgId: string) {
@@ -109,15 +156,17 @@ async function loadConversation(conversationId: string, orgId: string) {
   return { ...conversation, messages: [...conversation.messages].reverse() };
 }
 
-async function generateText(provider: string, apiKey: string, model: string, system: string, prompt: string, maxTokens?: number) {
-  const providerDef = getProviderConfig(provider);
-  const baseUrl = providerDef?.baseUrl || '';
+async function generateText(orgId: string, provider: string, apiKey: string, model: string, system: string, prompt: string, maxTokens?: number) {
+  const baseUrl = await getProviderBaseUrl(orgId, provider);
+  if (!baseUrl) throw new Error(`AI provider baseUrl is not configured for ${provider}`);
 
   if (provider === 'anthropic') return generateWithAnthropic(baseUrl, apiKey, model, system, prompt, maxTokens);
   if (provider === 'gemini') return generateWithGemini(baseUrl, apiKey, model, system, prompt, maxTokens);
 
   /* OpenAI, Qwen, Kimi all use OpenAI-compatible chat/completions API */
   if (provider === 'openai') return generateWithOpenaiCompat(`${baseUrl}/v1/chat/completions`, apiKey, model, system, prompt, maxTokens);
+  if (provider === 'openapi') return generateWithOpenaiCompat(`${baseUrl}/chat/completions`, apiKey, model, system, prompt, maxTokens);
+  if (provider === 'ollama') return generateWithOpenaiCompat(`${baseUrl}/chat/completions`, apiKey, model, system, prompt, maxTokens);
   if (provider === 'qwen') return generateWithOpenaiCompat(`${baseUrl}/compatible-mode/v1/chat/completions`, apiKey, model, system, prompt, maxTokens);
   if (provider === 'kimi') return generateWithOpenaiCompat(`${baseUrl}/v1/chat/completions`, apiKey, model, system, prompt, maxTokens);
 
@@ -173,7 +222,7 @@ export async function generateAiOutput(input: { orgId: string; conversationId: s
       ? buildSummaryPrompt(language)
       : buildSentimentPrompt(language);
 
-  const raw = await generateText(currentConfig.provider, apiKey, currentConfig.model, system, userPrompt);
+  const raw = await generateText(input.orgId, currentConfig.provider, apiKey, currentConfig.model, system, userPrompt);
 
   if (input.type === 'sentiment') {
     let parsed: SentimentResult;
@@ -277,7 +326,7 @@ export async function parseAppointmentFromText(input: { orgId: string; text: str
 
   let raw: string;
   try {
-    raw = await generateText(currentConfig.provider, apiKey, currentConfig.model, system, userPrompt);
+    raw = await generateText(input.orgId, currentConfig.provider, apiKey, currentConfig.model, system, userPrompt);
   } catch (err: unknown) {
     // AI fail (429 quota, timeout, network) → fallback to rule-based parser
     const msg = err instanceof Error ? err.message : String(err);
@@ -458,7 +507,7 @@ export async function aiFormatRichText(input: { orgId: string; rawText: string }
     // 2026-05-21 fix: cap đủ cho JSON output dài (text + nhiều style overlap per range).
     // Test với đoạn dự án 800 chars input → Gemini muốn trả ~7900 chars JSON ≈ 5000 tokens.
     // Set 8000 = sát limit Gemini 2.5 Flash (8192) + buffer. Nếu vẫn cap → cần shrink prompt.
-    const raw = await generateText(currentConfig.provider, apiKey, currentConfig.model, AI_FORMAT_SYSTEM_PROMPT, text, 8000);
+    const raw = await generateText(input.orgId, currentConfig.provider, apiKey, currentConfig.model, AI_FORMAT_SYSTEM_PROMPT, text, 8000);
 
     let parsed: { ranges?: unknown } | null = null;
     try {

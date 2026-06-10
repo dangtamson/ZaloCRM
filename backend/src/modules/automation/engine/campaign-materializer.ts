@@ -20,6 +20,7 @@ import { DEFAULT_RUNTIME_RULES, type SequenceStep } from '../sequences/types.js'
 import type { AutomationEvent } from './types.js';
 import { sanitizeContactCriteria, sanitizeManualContactIds } from './segment-sanitizer.js';
 import { applySendMessageTargetOverrides } from './send-message-trigger-targets.js';
+import { notifyAutomationRunTelegram } from './automation-telegram-notifier.js';
 
 const VN_TIMEZONE = 'Asia/Ho_Chi_Minh';
 
@@ -71,6 +72,8 @@ function getBirthdayWeekMonthDayKeys(now: Date): Set<number> {
   }
   return keys;
 }
+
+type CustomerListBirthdayMode = 'none' | 'week' | 'today';
 
 function emptySegmentResolution(contactIds: string[] = []): SegmentResolution {
   return { contactIds, templateProfileByContactId: new Map(), templateProfiles: [] };
@@ -129,17 +132,67 @@ function getPayloadTriggerId(payload: unknown): string | undefined {
   return typeof triggerId === 'string' && triggerId.trim() ? triggerId.trim() : undefined;
 }
 
+function isCustomerListSegment(spec: unknown): boolean {
+  return Boolean(
+    spec
+      && typeof spec === 'object'
+      && !Array.isArray(spec)
+      && (spec as Record<string, unknown>).kind === 'customer-list',
+  );
+}
+
+function getCustomerListBirthdayMode(spec: unknown): CustomerListBirthdayMode {
+  if (!isCustomerListSegment(spec)) return 'none';
+  const s = spec as Record<string, unknown>;
+  if (s.birthdayToday === true) return 'today';
+  if (s.birthdayThisWeek === true) return 'week';
+  return 'none';
+}
+
+function getTelegramMessageTargetIntegrationId(ruleOverrides: unknown): string | null {
+  if (!ruleOverrides || typeof ruleOverrides !== 'object' || Array.isArray(ruleOverrides)) return null;
+  const target = (ruleOverrides as Record<string, unknown>).telegramMessageTarget;
+  if (!target || typeof target !== 'object' || Array.isArray(target)) return null;
+  const integrationId = (target as Record<string, unknown>).integrationId;
+  return typeof integrationId === 'string' && integrationId.trim() ? integrationId.trim() : null;
+}
+
+async function notifyEmptyBirthdayCustomerListScan(input: {
+  orgId: string;
+  triggerName?: string | null;
+  birthdayMode: CustomerListBirthdayMode;
+  ruleOverrides: unknown;
+}): Promise<void> {
+  if (input.birthdayMode === 'none') return;
+  const condition = input.birthdayMode === 'today'
+    ? 'Sinh nhật trong ngày hôm nay'
+    : 'Sinh nhật trong tuần hiện tại';
+  await notifyAutomationRunTelegram({
+    orgId: input.orgId,
+    status: 'success',
+    mode: 'worker',
+    triggerName: input.triggerName ?? null,
+    actionType: 'Kiểm tra sinh nhật tệp người dùng',
+    telegramIntegrationId: getTelegramMessageTargetIntegrationId(input.ruleOverrides),
+    extraLines: [
+      `Điều kiện: ${condition}`,
+      'Số người thỏa điều kiện: 0',
+    ],
+  });
+}
+
 async function resolveCustomerListContacts(
   orgId: string,
   listId: string,
-  birthdayThisWeek: boolean,
+  birthdayMode: CustomerListBirthdayMode,
 ): Promise<SegmentResolution> {
+  const filtersBirthday = birthdayMode !== 'none';
   const entries = await prisma.customerListEntry.findMany({
     where: {
       customerListId: listId,
       status: { in: ['enriched', 'validated'] },
       phoneValid: true,
-      ...(birthdayThisWeek ? { birthDate: { not: null } } : {}),
+      ...(filtersBirthday ? { birthDate: { not: null } } : {}),
     },
     select: {
       phoneE164: true,
@@ -165,19 +218,23 @@ async function resolveCustomerListContacts(
     birthdayWish: string | null;
   }>;
 
-  const weekKeys = birthdayThisWeek ? getBirthdayWeekMonthDayKeys(getVnNow()) : null;
-  const inBirthdayWeek = (birthDate: Date | null): boolean => {
-    if (!weekKeys) return true;
+  const now = getVnNow();
+  const weekKeys = birthdayMode === 'week' ? getBirthdayWeekMonthDayKeys(now) : null;
+  const todayKey = birthdayMode === 'today' ? toMonthDayKey(now) : null;
+  const inBirthdayWindow = (birthDate: Date | null): boolean => {
+    if (birthdayMode === 'none') return true;
     if (!birthDate) return false;
-    return weekKeys.has(toMonthDayKey(new Date(birthDate)));
+    const key = toMonthDayKey(new Date(birthDate));
+    if (weekKeys) return weekKeys.has(key);
+    return todayKey === key;
   };
 
   const linkedContactIds = entries
-    .filter((e) => inBirthdayWeek(e.birthDate))
+    .filter((e) => inBirthdayWindow(e.birthDate))
     .flatMap((e) => [e.contactId, e.dupWithContactId])
     .filter((id): id is string => Boolean(id));
   const eligibleProfiles = entries
-    .filter((e) => inBirthdayWeek(e.birthDate))
+    .filter((e) => inBirthdayWindow(e.birthDate))
     .map((e) => toTemplateContactOverride({
       nameRaw: e.nameRaw,
       birthDate: e.birthDate,
@@ -189,13 +246,13 @@ async function resolveCustomerListContacts(
     .filter((profile) => Object.keys(profile).length > 0);
 
   const phones84 = entries
-    .filter((e) => !e.contactId && !e.dupWithContactId && e.phoneE164 && inBirthdayWeek(e.birthDate))
+    .filter((e) => birthdayMode !== 'today' && !e.contactId && !e.dupWithContactId && e.phoneE164 && inBirthdayWindow(e.birthDate))
     .map((e) => e.phoneE164!.replace(/^\+/, ''));
 
   const allIds = new Set<string>(linkedContactIds);
   const linkedProfileByContactId = new Map<string, CustomerListEntryProfile>();
   for (const e of entries) {
-    if (!inBirthdayWeek(e.birthDate)) continue;
+    if (!inBirthdayWindow(e.birthDate)) continue;
     for (const id of [e.contactId, e.dupWithContactId]) {
       if (!id || linkedProfileByContactId.has(id)) continue;
       linkedProfileByContactId.set(id, {
@@ -216,7 +273,7 @@ async function resolveCustomerListContacts(
     });
     const profileByPhone = new Map<string, CustomerListEntryProfile>();
     for (const e of entries) {
-      if (!e.phoneE164 || !inBirthdayWeek(e.birthDate)) continue;
+      if (!e.phoneE164 || !inBirthdayWindow(e.birthDate)) continue;
       const key = e.phoneE164.replace(/^\+/, '');
       if (!profileByPhone.has(key)) {
         profileByPhone.set(key, {
@@ -262,6 +319,7 @@ async function findTaskAnchorContactId(orgId: string): Promise<string | null> {
 export interface MaterializeResult {
   campaignsCreated: number;
   tasksEnqueued: number;
+  noopSuccesses: number;
   skipped: number;
   reasons: string[];
 }
@@ -327,8 +385,12 @@ async function resolveSegmentContacts(
   }
 
   if (s.kind === 'customer-list' && typeof s.listId === 'string') {
-    const birthdayThisWeek = s.birthdayThisWeek === true;
-    return resolveCustomerListContacts(orgId, s.listId, birthdayThisWeek);
+    const birthdayMode: CustomerListBirthdayMode = s.birthdayToday === true
+      ? 'today'
+      : s.birthdayThisWeek === true
+        ? 'week'
+        : 'none';
+    return resolveCustomerListContacts(orgId, s.listId, birthdayMode);
   }
 
   // import-batch: soft reference (table ships later) — skip silently for now
@@ -338,7 +400,7 @@ async function resolveSegmentContacts(
 export async function materializeFromEvent(
   event: AutomationEvent,
 ): Promise<MaterializeResult> {
-  const result: MaterializeResult = { campaignsCreated: 0, tasksEnqueued: 0, skipped: 0, reasons: [] };
+  const result: MaterializeResult = { campaignsCreated: 0, tasksEnqueued: 0, noopSuccesses: 0, skipped: 0, reasons: [] };
   const payloadTriggerId = getPayloadTriggerId(event.payload);
 
   // Find enabled triggers matching eventType in this org
@@ -363,6 +425,16 @@ export async function materializeFromEvent(
       result.reasons.push(`trigger ${trigger.id}: eventFilter mismatch`);
       continue;
     }
+
+    const effectiveSegmentSpec = trigger.segmentSpec ?? event.segmentHint;
+    const usesCustomerListSegment = isCustomerListSegment(effectiveSegmentSpec);
+    const customerListBirthdayMode = getCustomerListBirthdayMode(effectiveSegmentSpec);
+    if (event.type === 'birthday' && event.contactId && usesCustomerListSegment) {
+      result.skipped++;
+      result.reasons.push(`trigger ${trigger.id}: customer-list birthday trigger ignores CRM contact birthday event`);
+      continue;
+    }
+    const segmentHintContactId = usesCustomerListSegment ? null : event.contactId ?? null;
 
     // 2. Branch by bindingKind. Broadcast-bound triggers are out of scope here
     //    (Broadcast routes have their own dedicated materializer via fire-broadcast).
@@ -394,8 +466,8 @@ export async function materializeFromEvent(
 
       const segmentResolution = await resolveSegmentContacts(
         event.orgId,
-        trigger.segmentSpec ?? event.segmentHint,
-        event.contactId ?? null,
+        effectiveSegmentSpec,
+        segmentHintContactId,
       );
       const contactIds = [...segmentResolution.contactIds];
       if (contactIds.length === 0 && hasHtmlImageTemplate(block.content) && segmentResolution.templateProfiles.length > 0) {
@@ -403,8 +475,18 @@ export async function materializeFromEvent(
         if (anchorContactId) contactIds.push(anchorContactId);
       }
       if (contactIds.length === 0) {
-        result.skipped++;
-        result.reasons.push(`trigger ${trigger.id}: no contacts resolved (block-bound)`);
+        if (usesCustomerListSegment && customerListBirthdayMode !== 'none' && segmentResolution.templateProfiles.length === 0) {
+          await notifyEmptyBirthdayCustomerListScan({
+            orgId: event.orgId,
+            triggerName: trigger.name,
+            birthdayMode: customerListBirthdayMode,
+            ruleOverrides: trigger.ruleOverrides,
+          });
+          result.noopSuccesses++;
+        } else {
+          result.skipped++;
+          result.reasons.push(`trigger ${trigger.id}: no contacts resolved (block-bound)`);
+        }
         continue;
       }
 
@@ -544,13 +626,23 @@ export async function materializeFromEvent(
     // 3. Resolve contacts
     const segmentResolution = await resolveSegmentContacts(
       event.orgId,
-      trigger.segmentSpec ?? event.segmentHint,
-      event.contactId ?? null,
+      effectiveSegmentSpec,
+      segmentHintContactId,
     );
     const contactIds = segmentResolution.contactIds;
     if (contactIds.length === 0) {
-      result.skipped++;
-      result.reasons.push(`trigger ${trigger.id}: no contacts resolved`);
+      if (usesCustomerListSegment && customerListBirthdayMode !== 'none' && segmentResolution.templateProfiles.length === 0) {
+        await notifyEmptyBirthdayCustomerListScan({
+          orgId: event.orgId,
+          triggerName: trigger.name,
+          birthdayMode: customerListBirthdayMode,
+          ruleOverrides: trigger.ruleOverrides,
+        });
+        result.noopSuccesses++;
+      } else {
+        result.skipped++;
+        result.reasons.push(`trigger ${trigger.id}: no contacts resolved`);
+      }
       continue;
     }
 

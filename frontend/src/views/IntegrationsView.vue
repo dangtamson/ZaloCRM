@@ -95,6 +95,14 @@
           <template v-if="form.type === 'telegram'">
             <v-text-field v-model="form.config.botToken" label="Bot Token *" type="password" class="mb-2" />
             <v-text-field v-model="form.config.chatId" label="Chat ID *" class="mb-2" />
+            <v-text-field
+              v-model="form.config.messageThreadId"
+              label="Message Thread ID"
+              type="number"
+              class="mb-2"
+              hint="Tuỳ chọn. Dùng khi gửi vào topic trong Telegram supergroup/forum."
+              persistent-hint
+            />
           </template>
 
           <template v-if="form.type === 'facebook'">

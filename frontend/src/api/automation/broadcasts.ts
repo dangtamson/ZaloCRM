@@ -12,7 +12,7 @@ export interface BroadcastPacing {
 export type SegmentSpec =
   | { kind: 'manual'; contactIds: string[] }
   | { kind: 'filter'; criteria: Record<string, unknown> }
-  | { kind: 'customer-list'; listId: string; birthdayThisWeek?: boolean };
+  | { kind: 'customer-list'; listId: string; birthdayThisWeek?: boolean; birthdayToday?: boolean };
 
 export interface Broadcast {
   id: string;

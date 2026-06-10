@@ -8,10 +8,14 @@ const prismaMock = {
   automationCampaign: { findFirst: vi.fn(), create: vi.fn() },
   automationTask: { findFirst: vi.fn(), create: vi.fn() },
 };
+const notifyAutomationRunTelegramMock = vi.fn();
 
 vi.mock('../src/shared/database/prisma-client.js', () => ({ prisma: prismaMock }));
 vi.mock('../src/shared/utils/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+vi.mock('../src/modules/automation/engine/automation-telegram-notifier.js', () => ({
+  notifyAutomationRunTelegram: notifyAutomationRunTelegramMock,
 }));
 
 const { materializeFromEvent } = await import('../src/modules/automation/engine/campaign-materializer.js');
@@ -191,6 +195,168 @@ describe('campaign materializer customer-list profile templates', () => {
     });
   });
 
+  it('filters customer-list entries to birthdays today without scanning CRM contacts', async () => {
+    prismaMock.automationTrigger.findMany.mockResolvedValueOnce([
+      {
+        id: 'trigger-1',
+        eventType: 'scheduled_cron',
+        enabled: true,
+        bindingKind: 'block',
+        blockId: 'block-1',
+        eventFilter: null,
+        segmentSpec: { kind: 'customer-list', listId: 'list-1', birthdayToday: true },
+        ruleOverrides: null,
+        sequenceId: null,
+        sequence: null,
+      },
+    ]);
+    prismaMock.customerListEntry.findMany.mockResolvedValueOnce([
+      {
+        phoneE164: '+84901111111',
+        contactId: null,
+        dupWithContactId: null,
+        nameRaw: 'Anh Sinh Nhat Hom Nay',
+        birthDate: new Date('1981-06-08T00:00:00.000Z'),
+        gender: 'male',
+        occupation: 'Giam doc',
+        unit: 'Don vi A',
+        birthdayWish: null,
+      },
+      {
+        phoneE164: '+84902222222',
+        contactId: null,
+        dupWithContactId: null,
+        nameRaw: 'Chi Sinh Nhat Ngay Khac',
+        birthDate: new Date('1992-06-09T00:00:00.000Z'),
+        gender: 'female',
+        occupation: 'Nhan su',
+        unit: 'Don vi B',
+        birthdayWish: null,
+      },
+    ]);
+
+    const result = await materializeFromEvent({
+      id: 'event-1',
+      orgId: 'org-1',
+      type: 'scheduled_cron',
+      occurredAt: new Date('2026-06-08T02:00:00.000Z'),
+      payload: { triggerId: 'trigger-1' },
+    });
+
+    expect(result.tasksEnqueued).toBe(1);
+    expect(prismaMock.contact.findMany).not.toHaveBeenCalled();
+    expect(prismaMock.contact.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: { orgId: 'org-1', mergedInto: null },
+    }));
+    expect(prismaMock.automationTask.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        contactId: 'sample-contact-1',
+        blockSnapshot: expect.objectContaining({
+          __templateContactOverride: {
+            fullName: 'Anh Sinh Nhat Hom Nay',
+            crmName: 'Anh Sinh Nhat Hom Nay',
+            birthDate: '1981-06-08T00:00:00.000Z',
+            gender: 'male',
+            occupation: 'Giam doc',
+            unit: 'Don vi A',
+          },
+        }),
+      }),
+    });
+  });
+
+  it('notifies Telegram when birthday-today customer-list scan finds zero eligible entries', async () => {
+    prismaMock.automationTrigger.findMany.mockResolvedValueOnce([
+      {
+        id: 'trigger-1',
+        name: 'Sinh nhật hôm nay',
+        eventType: 'scheduled_cron',
+        enabled: true,
+        bindingKind: 'block',
+        blockId: 'block-1',
+        eventFilter: null,
+        segmentSpec: { kind: 'customer-list', listId: 'list-1', birthdayToday: true },
+        ruleOverrides: {
+          telegramMessageTarget: { integrationId: 'telegram-1' },
+        },
+        sequenceId: null,
+        sequence: null,
+      },
+    ]);
+    prismaMock.customerListEntry.findMany.mockResolvedValueOnce([
+      {
+        phoneE164: '+84902222222',
+        contactId: null,
+        dupWithContactId: null,
+        nameRaw: 'Chi Sinh Nhat Ngay Khac',
+        birthDate: new Date('1992-06-09T00:00:00.000Z'),
+        gender: 'female',
+        occupation: 'Nhan su',
+        unit: 'Don vi B',
+        birthdayWish: null,
+      },
+    ]);
+
+    const result = await materializeFromEvent({
+      id: 'event-1',
+      orgId: 'org-1',
+      type: 'scheduled_cron',
+      occurredAt: new Date('2026-06-08T02:00:00.000Z'),
+      payload: { triggerId: 'trigger-1' },
+    });
+
+    expect(result.tasksEnqueued).toBe(0);
+    expect(result.skipped).toBe(0);
+    expect(result.noopSuccesses).toBe(1);
+    expect(result.reasons).not.toContain('trigger trigger-1: no contacts resolved (block-bound)');
+    expect(prismaMock.automationTask.create).not.toHaveBeenCalled();
+    expect(notifyAutomationRunTelegramMock).toHaveBeenCalledWith(expect.objectContaining({
+      orgId: 'org-1',
+      status: 'success',
+      mode: 'worker',
+      triggerName: 'Sinh nhật hôm nay',
+      actionType: 'Kiểm tra sinh nhật tệp người dùng',
+      telegramIntegrationId: 'telegram-1',
+      extraLines: [
+        'Điều kiện: Sinh nhật trong ngày hôm nay',
+        'Số người thỏa điều kiện: 0',
+      ],
+    }));
+  });
+
+  it('ignores CRM contact birthday events for customer-list birthday triggers', async () => {
+    prismaMock.automationTrigger.findMany.mockResolvedValueOnce([
+      {
+        id: 'trigger-1',
+        eventType: 'birthday',
+        enabled: true,
+        bindingKind: 'block',
+        blockId: 'block-1',
+        eventFilter: null,
+        segmentSpec: { kind: 'customer-list', listId: 'list-1', birthdayToday: true },
+        ruleOverrides: null,
+        sequenceId: null,
+        sequence: null,
+      },
+    ]);
+
+    const result = await materializeFromEvent({
+      id: 'event-1',
+      orgId: 'org-1',
+      type: 'birthday',
+      contactId: 'crm-contact-1',
+      occurredAt: new Date('2026-06-08T02:00:00.000Z'),
+      payload: { month: 6, day: 8 },
+    });
+
+    expect(result.tasksEnqueued).toBe(0);
+    expect(result.skipped).toBe(1);
+    expect(result.reasons).toContain('trigger trigger-1: customer-list birthday trigger ignores CRM contact birthday event');
+    expect(prismaMock.customerListEntry.findMany).not.toHaveBeenCalled();
+    expect(prismaMock.contact.findMany).not.toHaveBeenCalled();
+    expect(prismaMock.automationTask.create).not.toHaveBeenCalled();
+  });
+
   it('includes customer-list birthday entries that are not linked to CRM contacts', async () => {
     prismaMock.customerListEntry.findMany.mockResolvedValueOnce([
       {
@@ -304,6 +470,7 @@ describe('campaign materializer customer-list profile templates', () => {
         eventFilter: null,
         segmentSpec: { kind: 'customer-list', listId: 'list-1', birthdayThisWeek: true },
         ruleOverrides: {
+          telegramMessageTarget: { integrationId: 'telegram-1' },
           sendMessageTargets: {
             groupTargets: [{ accountId: 'nick-trigger', groupId: 'group-trigger' }],
             userTargets: [{ accountId: 'nick-user', contactId: 'contact-user' }],
@@ -335,6 +502,7 @@ describe('campaign materializer customer-list profile templates', () => {
     expect(prismaMock.automationTask.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         blockSnapshot: expect.objectContaining({
+          telegramMessageTarget: { integrationId: 'telegram-1' },
           groupTargets: [{ accountId: 'nick-trigger', groupId: 'group-trigger' }],
           userTargets: [{ accountId: 'nick-user', contactId: 'contact-user' }],
         }),

@@ -24,6 +24,7 @@ export function applySendMessageTargetOverrides(
   const snapshot = content && typeof content === 'object' && !Array.isArray(content)
     ? { ...(content as Record<string, unknown>) }
     : {};
+  applyTelegramMessageTarget(snapshot, ruleOverrides);
   const targets = readSendMessageTargetOverrides(ruleOverrides);
   if (!targets) return snapshot;
 
@@ -33,6 +34,18 @@ export function applySendMessageTargetOverrides(
   if (targets.groupTargets.length > 0) snapshot.groupTargets = targets.groupTargets;
   if (targets.userTargets.length > 0) snapshot.userTargets = targets.userTargets;
   return snapshot;
+}
+
+function applyTelegramMessageTarget(snapshot: Record<string, unknown>, ruleOverrides: unknown): void {
+  if (!isObject(ruleOverrides)) return;
+  const target = ruleOverrides.telegramMessageTarget;
+  if (!isObject(target)) {
+    delete snapshot.telegramMessageTarget;
+    return;
+  }
+  const integrationId = readString(target.integrationId);
+  if (integrationId) snapshot.telegramMessageTarget = { integrationId };
+  else delete snapshot.telegramMessageTarget;
 }
 
 function readGroupTargets(value: unknown): GroupTarget[] {

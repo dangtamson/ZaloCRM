@@ -12,6 +12,7 @@ export type ProviderDef = {
   name: string;
   baseUrl: string;
   authToken: string;
+  authRequired: boolean;
   models: ProviderModel[];
 };
 
@@ -28,6 +29,7 @@ function buildProviders(): ProviderDef[] {
       name: 'Anthropic',
       baseUrl: config.anthropicBaseUrl,
       authToken: config.anthropicAuthToken,
+      authRequired: true,
       models: [
         m('Claude Opus', config.anthropicDefaultOpusModel),
         m('Claude Sonnet', config.anthropicDefaultSonnetModel),
@@ -39,9 +41,10 @@ function buildProviders(): ProviderDef[] {
       name: 'Gemini',
       baseUrl: config.geminiBaseUrl,
       authToken: config.geminiAuthToken,
+      authRequired: true,
       models: [
-        m('Gemini Pro', config.geminiDefaultProModel),
-        m('Gemini Flash', config.geminiDefaultFlashModel),
+        m('Gemini Pro', config.geminiDefaultProModel || 'gemini-1.5-pro'),
+        m('Gemini Flash', config.geminiDefaultFlashModel || 'gemini-2.5-flash'),
       ].filter(Boolean) as ProviderModel[],
     },
     {
@@ -49,9 +52,30 @@ function buildProviders(): ProviderDef[] {
       name: 'OpenAI',
       baseUrl: config.openaiBaseUrl,
       authToken: config.openaiAuthToken,
+      authRequired: true,
       models: [
-        m('GPT-4o', config.openaiDefaultGpt4oModel),
-        m('GPT-4o Mini', config.openaiDefaultGpt4oMiniModel),
+        m('GPT-4o', config.openaiDefaultGpt4oModel || 'gpt-4o'),
+        m('GPT-4o Mini', config.openaiDefaultGpt4oMiniModel || 'gpt-4o-mini'),
+      ].filter(Boolean) as ProviderModel[],
+    },
+    {
+      id: 'openapi',
+      name: 'OpenAPI Compatible',
+      baseUrl: config.openapiBaseUrl,
+      authToken: config.openapiAuthToken,
+      authRequired: true,
+      models: [
+        m('Custom Model', config.openapiDefaultModel),
+      ].filter(Boolean) as ProviderModel[],
+    },
+    {
+      id: 'ollama',
+      name: 'Ollama',
+      baseUrl: config.ollamaBaseUrl,
+      authToken: config.ollamaAuthToken,
+      authRequired: false,
+      models: [
+        m('Llama 3.1', config.ollamaDefaultModel || 'llama3.1'),
       ].filter(Boolean) as ProviderModel[],
     },
     {
@@ -59,6 +83,7 @@ function buildProviders(): ProviderDef[] {
       name: 'Qwen',
       baseUrl: config.qwenBaseUrl,
       authToken: config.qwenAuthToken,
+      authRequired: true,
       models: [
         m('Qwen Plus', config.qwenDefaultPlusModel),
         m('Qwen Turbo', config.qwenDefaultTurboModel),
@@ -70,6 +95,7 @@ function buildProviders(): ProviderDef[] {
       name: 'Kimi',
       baseUrl: config.kimiBaseUrl,
       authToken: config.kimiAuthToken,
+      authRequired: true,
       models: [
         m('Moonshot V1', config.kimiDefaultMoonshotV1Model),
       ].filter(Boolean) as ProviderModel[],
@@ -79,10 +105,10 @@ function buildProviders(): ProviderDef[] {
 
 const providers = buildProviders();
 
-/** Returns providers that have an auth token AND at least one model configured */
+/** Returns providers that can be configured in the UI. Runtime validates key/baseUrl. */
 export function getAvailableProviders(): Omit<ProviderDef, 'authToken'>[] {
   return providers
-    .filter((p) => p.authToken && p.models.length > 0)
+    .filter((p) => p.models.length > 0)
     .map(({ authToken: _, ...rest }) => rest);
 }
 

@@ -113,7 +113,14 @@ const saving = ref(false);
 const testing = ref(false);
 const showAiConfig = ref(false);
 const aiSaving = ref(false);
-const aiConfig = ref({ provider: 'anthropic', model: 'claude-sonnet-4-6', maxDaily: 500, enabled: true });
+const aiConfig = ref({
+  provider: 'gemini',
+  model: 'gemini-2.5-flash',
+  maxDaily: 500,
+  enabled: true,
+  providerBaseUrl: '',
+  providerApiKeyConfigured: false,
+});
 
 const snack = ref({ show: false, text: '', color: 'success' });
 
@@ -149,9 +156,18 @@ async function loadAiConfig() {
       model: res.data.model,
       maxDaily: res.data.maxDaily,
       enabled: res.data.enabled,
+      providerBaseUrl: res.data.providerBaseUrl ?? '',
+      providerApiKeyConfigured: Boolean(res.data.providerApiKeyConfigured),
     };
   } catch {
-    aiConfig.value = { provider: 'anthropic', model: 'claude-sonnet-4-6', maxDaily: 500, enabled: true };
+    aiConfig.value = {
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      maxDaily: 500,
+      enabled: true,
+      providerBaseUrl: '',
+      providerApiKeyConfigured: false,
+    };
   }
 }
 
@@ -201,7 +217,7 @@ async function testWebhook() {
   }
 }
 
-async function saveAiConfig(value: { provider: string; model: string; maxDaily: number; enabled: boolean }) {
+async function saveAiConfig(value: { provider: string; model: string; maxDaily: number; enabled: boolean; apiKey?: string; baseUrl?: string }) {
   aiSaving.value = true;
   try {
     const res = await api.put('/ai/config', value);
@@ -210,6 +226,8 @@ async function saveAiConfig(value: { provider: string; model: string; maxDaily: 
       model: res.data.model,
       maxDaily: res.data.maxDaily,
       enabled: res.data.enabled,
+      providerBaseUrl: res.data.providerBaseUrl ?? value.baseUrl ?? '',
+      providerApiKeyConfigured: Boolean(res.data.providerApiKeyConfigured || value.apiKey),
     };
     showAiConfig.value = false;
     showSnack('Đã lưu cấu hình AI');
