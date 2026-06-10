@@ -4,6 +4,10 @@ import AuthLayout from '../layouts/AuthLayout';
 import MobileLayout from '../layouts/MobileLayout';
 import { useMobile } from '../hooks/useMobile';
 import { useAuthStore } from '../store/auth';
+import LoginPage from '../pages/LoginPage';
+import NotFoundPage from '../pages/NotFoundPage';
+import ProfilePage from '../pages/ProfilePage';
+import SetupPage from '../pages/SetupPage';
 
 const LEGACY_SETTINGS_TAB_MAP: Record<string, string> = {
   users: '/settings/team/users',
@@ -27,14 +31,6 @@ function PlaceholderPage({ title }: PlaceholderPageProps) {
       <p className="text-sm text-slate-600">React migration route placeholder.</p>
     </section>
   );
-}
-
-function LoginPage() {
-  return <PlaceholderPage title="Login" />;
-}
-
-function SetupPage() {
-  return <PlaceholderPage title="Setup" />;
 }
 
 function AuthRouteLayout() {
@@ -137,7 +133,7 @@ export const appRoutes = [
       { path: '/', element: <PlaceholderPage title="Dashboard" /> },
       { path: '/chat/:convId?', element: <PlaceholderPage title="Chat" /> },
       { path: '/contacts', element: <PlaceholderPage title="Contacts" /> },
-      { path: '/profile', element: <PlaceholderPage title="Profile" /> },
+      { path: '/profile', element: <ProfilePage /> },
       { path: '/appointments', element: <PlaceholderPage title="Appointments" /> },
       { path: '/reports', element: <PlaceholderPage title="Reports" /> },
       { path: '/analytics', element: <PlaceholderPage title="Analytics" /> },
@@ -156,7 +152,7 @@ export const appRoutes = [
       { path: '/friends', element: <PlaceholderPage title="Friends" /> },
     ],
   },
-  { path: '*', element: <PlaceholderPage title="NotFound" /> },
+  { path: '*', element: <NotFoundPage /> },
 ];
 
 export function createMemoryAppRouter(initialEntries: string[] = ['/']) {
