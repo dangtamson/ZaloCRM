@@ -11,9 +11,10 @@ interface AutomationTableProps<T extends { id: string }> {
   rows: T[];
   columns: Array<AutomationTableColumn<T>>;
   emptyLabel: string;
+  actions?: (row: T) => ReactNode;
 }
 
-export default function AutomationTable<T extends { id: string }>({ rows, columns, emptyLabel }: AutomationTableProps<T>) {
+export default function AutomationTable<T extends { id: string }>({ rows, columns, emptyLabel, actions }: AutomationTableProps<T>) {
   if (!rows.length) {
     return <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">{emptyLabel}</div>;
   }
@@ -26,6 +27,7 @@ export default function AutomationTable<T extends { id: string }>({ rows, column
             {columns.map((column) => (
               <th className="px-4 py-3 font-semibold" key={column.key}>{column.label}</th>
             ))}
+            {actions ? <th className="px-4 py-3 text-right font-semibold">Actions</th> : null}
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 bg-white">
@@ -34,6 +36,7 @@ export default function AutomationTable<T extends { id: string }>({ rows, column
               {columns.map((column) => (
                 <td className="px-4 py-3 text-slate-700" key={column.key}>{column.render(row)}</td>
               ))}
+              {actions ? <td className="px-4 py-3 text-right text-slate-700">{actions(row)}</td> : null}
             </tr>
           ))}
         </tbody>
