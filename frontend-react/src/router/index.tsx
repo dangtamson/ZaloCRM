@@ -4,9 +4,12 @@ import AuthLayout from '../layouts/AuthLayout';
 import MobileLayout from '../layouts/MobileLayout';
 import { useMobile } from '../hooks/useMobile';
 import { useAuthStore } from '../store/auth';
+import AnalyticsPage from '../pages/AnalyticsPage';
+import DashboardPage from '../pages/DashboardPage';
 import LoginPage from '../pages/LoginPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import ProfilePage from '../pages/ProfilePage';
+import ReportsPage from '../pages/ReportsPage';
 import SetupPage from '../pages/SetupPage';
 
 const LEGACY_SETTINGS_TAB_MAP: Record<string, string> = {
@@ -130,13 +133,13 @@ export const appRoutes = [
   {
     element: <RequireAuth />,
     children: [
-      { path: '/', element: <PlaceholderPage title="Dashboard" /> },
+      { path: '/', element: <DashboardPage /> },
       { path: '/chat/:convId?', element: <PlaceholderPage title="Chat" /> },
       { path: '/contacts', element: <PlaceholderPage title="Contacts" /> },
       { path: '/profile', element: <ProfilePage /> },
       { path: '/appointments', element: <PlaceholderPage title="Appointments" /> },
-      { path: '/reports', element: <PlaceholderPage title="Reports" /> },
-      { path: '/analytics', element: <PlaceholderPage title="Analytics" /> },
+      { path: '/reports', element: <ReportsPage /> },
+      { path: '/analytics', element: <AnalyticsPage /> },
       { path: '/settings/zalo-labels', element: <Navigate replace to="/settings/crm/zalo-labels" /> },
       { path: '/settings/scoring', element: <Navigate replace to="/settings/crm/scoring" /> },
       { path: '/api-settings', element: <Navigate replace to="/settings/dev/api" /> },

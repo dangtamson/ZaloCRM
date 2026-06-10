@@ -26,19 +26,21 @@ describe('SetupPage', () => {
 
   it('creates the first organization and navigates to the dashboard', async () => {
     apiClient.defaults.adapter = async (config) => {
-      expect(config.url).toBe('/setup');
-      expect(config.method).toBe('post');
-      return response(config, {
-        token: 'setup-token',
-        user: {
-          id: 'user-1',
-          email: 'owner@example.com',
-          fullName: 'Owner User',
-          role: 'owner',
-          orgId: 'org-1',
-          orgName: 'VNPT',
-        },
-      });
+      if (config.url === '/setup') {
+        expect(config.method).toBe('post');
+        return response(config, {
+          token: 'setup-token',
+          user: {
+            id: 'user-1',
+            email: 'owner@example.com',
+            fullName: 'Owner User',
+            role: 'owner',
+            orgId: 'org-1',
+            orgName: 'VNPT',
+          },
+        });
+      }
+      return response(config, Array.isArray(config.url?.match(/pipeline|sources|appointments/)) ? [] : {});
     };
 
     render(<RouterProvider router={createMemoryAppRouter(['/setup'])} />);
