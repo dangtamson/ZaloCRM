@@ -382,7 +382,7 @@ Verify the detail table, column toggles, and row editing still work with mocked 
 - Create: `frontend-react/src/hooks/useZaloPresence.ts`
 - Create: `frontend-react/src/hooks/usePrivacyVisibility.ts`
 
-- [ ] **Step 1: Port the conversation list and message thread**
+- [x] **Step 1: Port the conversation list and message thread**
 
 Use the existing Vue module as the contract reference for caching, pagination, message ordering, read receipts, reaction display, and reply rendering.
 

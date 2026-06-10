@@ -10,6 +10,7 @@ import AutomationPage from '../pages/automation/AutomationPage';
 import BlocksPage from '../pages/automation/BlocksPage';
 import BotAutoShell from '../pages/automation/BotAutoShell';
 import BroadcastsPage from '../pages/automation/BroadcastsPage';
+import ChatPage from '../pages/ChatPage';
 import CrmTagManagement from '../components/settings/CrmTagManagement';
 import ContactProfilePage from '../pages/crm/ContactProfilePage';
 import ContactsPage from '../pages/crm/ContactsPage';
@@ -161,7 +162,7 @@ export const appRoutes = [
     element: <RequireAuth />,
     children: [
       { path: '/', element: <DashboardPage /> },
-      { path: '/chat/:convId?', element: <PlaceholderPage title="Chat" /> },
+      { path: '/chat/:convId?', element: <ChatPage /> },
       { path: '/contacts', element: <ContactsPage /> },
       { path: '/profile', element: <ProfilePage /> },
       { path: '/appointments', element: <AppointmentsPage /> },
