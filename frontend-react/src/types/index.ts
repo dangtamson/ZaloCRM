@@ -7,3 +7,7 @@ export interface JsonObject {
 }
 
 export type Nullable<T> = T | null;
+
+export type { AuthResponse, BackendProfile, SetupInput, User } from './auth';
+export type { PrivacySession, PrivacyStatus } from './privacy';
+export type { DepartmentNode, PermissionGroupNode, RbacMatrixMeta, RbacUser } from './rbac';
