@@ -6,6 +6,10 @@ import { useMobile } from '../hooks/useMobile';
 import { useAuthStore } from '../store/auth';
 import AnalyticsPage from '../pages/AnalyticsPage';
 import AppointmentsPage from '../pages/crm/AppointmentsPage';
+import AutomationPage from '../pages/automation/AutomationPage';
+import BlocksPage from '../pages/automation/BlocksPage';
+import BotAutoShell from '../pages/automation/BotAutoShell';
+import BroadcastsPage from '../pages/automation/BroadcastsPage';
 import CrmTagManagement from '../components/settings/CrmTagManagement';
 import ContactProfilePage from '../pages/crm/ContactProfilePage';
 import ContactsPage from '../pages/crm/ContactsPage';
@@ -14,6 +18,8 @@ import DashboardPage from '../pages/DashboardPage';
 import DepartmentsPage from '../pages/rbac/DepartmentsPage';
 import FriendsPage from '../pages/crm/FriendsPage';
 import GroupsPage from '../pages/crm/GroupsPage';
+import ListDetailPage from '../pages/automation/ListDetailPage';
+import ListsPage from '../pages/automation/ListsPage';
 import LoginPage from '../pages/LoginPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import OrgSettings from '../components/settings/OrgSettings';
@@ -22,11 +28,13 @@ import PersonalPasswordPage from '../pages/settings/PersonalPasswordPage';
 import PersonalProfilePage from '../pages/settings/PersonalProfilePage';
 import ProfilePage from '../pages/ProfilePage';
 import ReportsPage from '../pages/ReportsPage';
+import SequencesPage from '../pages/automation/SequencesPage';
 import SetupPage from '../pages/SetupPage';
 import SettingsComingSoon from '../pages/settings/SettingsComingSoon';
 import SettingsLayout from '../pages/settings/SettingsLayout';
 import StatusManagement from '../components/settings/StatusManagement';
 import StuckLeadsPage from '../pages/crm/StuckLeadsPage';
+import TriggersPage from '../pages/automation/TriggersPage';
 import UsersPage from '../pages/rbac/UsersPage';
 import ZaloAccountsPage from '../pages/crm/ZaloAccountsPage';
 import ZaloLabelsManagement from '../components/settings/ZaloLabelsManagement';
@@ -133,12 +141,12 @@ const settingsChildren = [
 
 const automationChildren = [
   { index: true, element: <Navigate replace to="/automation/bot/triggers" /> },
-  { path: 'triggers', element: <PlaceholderPage title="BotAuto.Triggers" /> },
-  { path: 'blocks', element: <PlaceholderPage title="BotAuto.Blocks" /> },
-  { path: 'sequences', element: <PlaceholderPage title="BotAuto.Sequences" /> },
-  { path: 'broadcasts', element: <PlaceholderPage title="BotAuto.Broadcasts" /> },
-  { path: 'lists', element: <PlaceholderPage title="BotAuto.Lists" /> },
-  { path: 'lists/:id', element: <PlaceholderPage title="BotAuto.ListDetail" /> },
+  { path: 'triggers', element: <TriggersPage /> },
+  { path: 'blocks', element: <BlocksPage /> },
+  { path: 'sequences', element: <SequencesPage /> },
+  { path: 'broadcasts', element: <BroadcastsPage /> },
+  { path: 'lists', element: <ListsPage /> },
+  { path: 'lists/:id', element: <ListDetailPage /> },
 ];
 
 export const appRoutes = [
@@ -168,8 +176,8 @@ export const appRoutes = [
       { path: '/customers/:id/activity', element: <CustomerActivityLogPage /> },
       { path: '/contacts/:id/profile', element: <ContactProfilePage /> },
       { path: '/leads/stuck', element: <StuckLeadsPage /> },
-      { path: '/automation', element: <PlaceholderPage title="Automation" /> },
-      { path: '/automation/bot', children: automationChildren },
+      { path: '/automation', element: <AutomationPage /> },
+      { path: '/automation/bot', element: <BotAutoShell />, children: automationChildren },
       { path: '/groups', element: <GroupsPage /> },
       { path: '/friends', element: <FriendsPage /> },
     ],

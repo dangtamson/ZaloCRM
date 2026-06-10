@@ -344,15 +344,15 @@ Verify column toggles, drawer opening, and deep-link rendering behave like the c
 - Create: `frontend-react/src/components/automation/phase7/BlockEditorDialog.tsx`
 - Create: `frontend-react/src/components/automation/phase7/SequenceStepEditor.tsx`
 
-- [ ] **Step 1: Port the legacy automation page**
+- [x] **Step 1: Port the legacy automation page**
 
 Keep `/automation` working as the legacy rules/templates entry so existing deep links do not break.
 
-- [ ] **Step 2: Port the Bot-Auto shell**
+- [x] **Step 2: Port the Bot-Auto shell**
 
 Recreate the nested `/automation/bot/*` routes, especially the list detail grid and the phase 7 editors.
 
-- [ ] **Step 3: Add automation regression tests**
+- [x] **Step 3: Add automation regression tests**
 
 Create:
 ```ts
