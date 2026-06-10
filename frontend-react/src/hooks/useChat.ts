@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { fetchConversationMessages, fetchConversations, sendConversationMessage } from '../api/chat';
 import type { ChatConversation, ChatMessage } from '../types/chat';
+import { subscribeChatSocket } from './chatSocket';
 import { useConversationCache } from './useConversationCache';
 
 export function useChat(initialConversationId?: string) {
@@ -65,6 +66,31 @@ export function useChat(initialConversationId?: string) {
     } finally {
       setSending(false);
     }
+  }, [cache, selectedConversationId]);
+
+  useEffect(() => {
+    return subscribeChatSocket('chat:message', ({ conversationId, message }) => {
+      setConversations((current) => {
+        const index = current.findIndex((conversation) => conversation.id === conversationId);
+        if (index === -1) return current;
+        const next = [...current];
+        const updated = {
+          ...next[index],
+          lastMessageAt: message.sentAt ?? next[index].lastMessageAt,
+          unreadCount: conversationId === selectedConversationId ? 0 : (next[index].unreadCount ?? 0) + 1,
+        };
+        next.splice(index, 1);
+        return [updated, ...next];
+      });
+
+      if (conversationId !== selectedConversationId) return;
+      setMessages((current) => {
+        if (current.some((item) => item.id === message.id)) return current;
+        const next = [...current, message].sort((a, b) => new Date(a.sentAt ?? '').getTime() - new Date(b.sentAt ?? '').getTime());
+        cache.setMessages(conversationId, next);
+        return next;
+      });
+    });
   }, [cache, selectedConversationId]);
 
   useEffect(() => {

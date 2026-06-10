@@ -386,15 +386,15 @@ Verify the detail table, column toggles, and row editing still work with mocked 
 
 Use the existing Vue module as the contract reference for caching, pagination, message ordering, read receipts, reaction display, and reply rendering.
 
-- [ ] **Step 2: Port socket-driven updates**
+- [x] **Step 2: Port socket-driven updates**
 
 Recreate the current socket.io listeners for conversations, presence, and message updates before moving on to richer message tools.
 
-- [ ] **Step 3: Port composer tools and privacy blur**
+- [x] **Step 3: Port composer tools and privacy blur**
 
 Move rich text, emoji/sticker/voice inputs, and privacy unlock behavior together so the composer state and redaction rules stay aligned.
 
-- [ ] **Step 4: Add realtime tests**
+- [x] **Step 4: Add realtime tests**
 
 Create:
 ```ts
