@@ -27,6 +27,9 @@ COPY --from=backend-builder /app/backend/prisma     /app/prisma
 COPY --from=backend-builder /app/backend/prisma.config.ts /app/prisma.config.ts
 COPY --from=backend-builder /app/backend/package.json /app/package.json
 COPY --from=frontend-builder /app/frontend/dist     /app/static
+# Seed automation static assets (e.g. birthday backgrounds) so
+# /automation-assets/image/* works immediately after deployment.
+COPY assets/posts/automation                          /app/assets/posts/automation
 
 RUN mkdir -p /var/lib/zalo-crm/files
 
