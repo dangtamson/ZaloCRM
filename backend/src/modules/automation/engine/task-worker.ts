@@ -126,6 +126,7 @@ export async function tick(): Promise<void> {
 // ── Per-task execution ────────────────────────────────────────────────────
 
 async function processTask(taskId: string): Promise<void> {
+  console.error('[task-worker] processTask START', { taskId });
   // Atomic claim: queued → running. If another worker already claimed it,
   // updateMany returns 0 → skip.
   const claim = await prisma.automationTask.updateMany({
@@ -149,6 +150,7 @@ async function processTask(taskId: string): Promise<void> {
       block: { select: { id: true, archivedAt: true, actionType: true } },
     },
   });
+  console.error('[task-worker] task loaded', { taskId, hasTask: !!task, hasCampaign: !!task?.campaign, hasBlock: !!task?.block });
   if (!task || !task.campaign || !task.block) {
     await markFailed(taskId, 'TASK_MISSING_REFS', 'Task missing campaign/block reference');
     return;

@@ -25,8 +25,10 @@ export function registerActionHandler(
 }
 
 export async function dispatchAction(ctx: ActionContext): Promise<ActionResult> {
+  console.error('[action-dispatcher] DISPATCH', { actionType: ctx.actionType, registeredHandlers: Array.from(handlers.keys()) });
   const handler = handlers.get(ctx.actionType);
   if (!handler) {
+    console.error('[action-dispatcher] NO HANDLER FOUND', { actionType: ctx.actionType });
     return {
       outcome: 'failure',
       errorCode: 'NOT_IMPLEMENTED',
@@ -34,8 +36,11 @@ export async function dispatchAction(ctx: ActionContext): Promise<ActionResult> 
       retryable: false,
     };
   }
+  console.error('[action-dispatcher] HANDLER FOUND', { actionType: ctx.actionType });
   try {
-    return await handler(ctx);
+    const result = await handler(ctx);
+    console.error('[action-dispatcher] HANDLER SUCCESS', { actionType: ctx.actionType, outcome: result.outcome });
+    return result;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.error(`[action-dispatcher] handler '${ctx.actionType}' threw:`, err);

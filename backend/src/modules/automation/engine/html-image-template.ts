@@ -4,6 +4,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { Resvg } from '@resvg/resvg-js';
 import { config } from '../../../config/index.js';
+import { logger } from '../../../shared/utils/logger.js';
 import { renderMessageTemplate, type AutomationTemplateContext } from '../template-renderer.js';
 
 /**
@@ -34,6 +35,7 @@ export interface HtmlImageTemplateResult {
 export async function renderHtmlTemplateToImage(
     input: HtmlImageTemplateInput,
 ): Promise<HtmlImageTemplateResult> {
+    logger.debug('[html-image-template] render start', { orgId: input.orgId, width: input.width, height: input.height });
     const width = clampInt(input.width, 320, 3000, 768);
     const height = clampInt(input.height, 320, 4000, 1152);
     const renderedMarkup = normalizeSvgAttributes((await rewriteAutomationAssetHrefs(renderMessageTemplate(
@@ -42,17 +44,24 @@ export async function renderHtmlTemplateToImage(
     )))).trim();
 
     if (!renderedMarkup) {
+        logger.error('[html-image-template] rendered markup empty');
         throw new Error('htmlImageTemplate.html rendered empty');
     }
     if (!/^<svg[\s>]/i.test(renderedMarkup)) {
+        logger.error('[html-image-template] not SVG markup', { first80: renderedMarkup.substring(0, 80) });
         throw new Error(
             'htmlImageTemplate hiện hỗ trợ SVG markup để render ảnh. ' +
             'Hãy chọn mẫu SVG có sẵn hoặc dùng template bắt đầu bằng <svg>.',
         );
     }
 
+    logger.debug('[html-image-template] creating Resvg with font config');
     const png = new Resvg(renderedMarkup, {
         fitTo: { mode: 'width', value: width },
+        font: {
+            loadSystemFonts: true,
+            defaultFontFamily: 'DejaVu Sans',
+        },
     }).render().asPng();
 
     const orgSegment = sanitizeOrgSegment(input.orgId);
@@ -62,13 +71,16 @@ export async function renderHtmlTemplateToImage(
 
     const fileName = `${randomUUID()}.png`;
     const filePath = path.join(orgDir, fileName);
+    logger.info('[html-image-template] writing PNG', { filePath, size: png.length });
     await fs.writeFile(filePath, png);
 
     const origin = config.appUrl.replace(/\/+$/, '');
     const publicPrefix = config.aiImagePublicPrefix.replace(/\/+$/, '');
+    const url = `${origin}${publicPrefix}/${orgSegment}/${fileName}`;
+    logger.info('[html-image-template] render complete', { url });
     return {
         filePath,
-        url: `${origin}${publicPrefix}/${orgSegment}/${fileName}`,
+        url,
     };
 }
 

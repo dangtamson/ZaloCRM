@@ -29,6 +29,7 @@ services:
         condition: service_healthy
     volumes:
       - file_storage:/var/lib/zalo-crm/files
+      - app_assets:/app/assets/posts/automation
     tmpfs:
       - /tmp
     security_opt:
@@ -152,3 +153,4 @@ volumes:
   file_storage:
   redis_data:
   minio_data:
+  app_assets:
