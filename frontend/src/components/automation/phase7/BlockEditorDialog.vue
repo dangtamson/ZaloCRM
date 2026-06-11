@@ -322,7 +322,7 @@ const BIRTHDAY_VNPT_SVG_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg" widt
       .serif { font-family: 'Times New Roman', Georgia, serif; }
       .script { font-family: 'Brush Script MT', 'Segoe Script', cursive; font-style: italic; }
       .name { fill: #8a5b14; font-size: 64px; }
-      .unit { fill: #ffffff; font-size: 25px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+      .unit { fill: #ffffff; font-size: 30px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
       .dob { fill: #06184a; font-size: 43px; font-weight: 700; letter-spacing: 8px; }
       .message { fill: #0b1f5f; font-size: 25px; font-style: italic; }
     </style>
@@ -335,8 +335,8 @@ const BIRTHDAY_VNPT_SVG_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg" widt
   <rect x="286" y="594" width="530" height="150" fill="#f6e9de" opacity="0"/>
 
   <text x="465" y="326" text-anchor="middle" class="script name">{{contact.salutation}} {{contact.fullName}}</text>
-  <text x="487" y="402" text-anchor="middle" class="serif unit">{{contact.occupation}} - {{contact.unit}}</text>
-  <text x="540" y="542" text-anchor="middle" class="serif dob">{{contact.birthDate}}</text>
+  <text x="487" y="410" text-anchor="middle" class="serif unit">{{contact.unit}}</text>
+  <text x="550" y="555" text-anchor="middle" class="serif dob">{{contact.birthDate}}</text>
   <text x="557" y="625" text-anchor="middle" class="serif message">
     <tspan x="557" dy="0">{{contact.birthdayWishLine1}}</tspan>
     <tspan x="557" dy="38">{{contact.birthdayWishLine2}}</tspan>

@@ -31,7 +31,7 @@ function defaultBirthdayWishLines(context: AutomationTemplateContext): string[] 
   return [
     `Nhân dịp sinh nhật của ${s}, kính chúc ${s} luôn`,
     'dồi dào sức khỏe, hạnh phúc, thành công và tiếp tục',
-    `dẫn dắt ${unit} phát triển vững mạnh,`,
+    `đồng hành cùng với đơn vị phát triển vững mạnh,`,
     'hoàn thành xuất sắc mọi nhiệm vụ, đóng góp tích cực',
     'vào sự phát triển chung của VNPT.',
   ];
