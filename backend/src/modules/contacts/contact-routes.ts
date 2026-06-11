@@ -19,6 +19,7 @@ import { normalizePhone } from '../../shared/utils/phone.js';
 import { logActivity, computeDiff } from '../activity/activity-logger.js';
 import { emitWebhook } from '../api/webhook-service.js';
 import { setPrimaryOwner } from './contact-access.js';
+import { requireGrant } from '../rbac/rbac-middleware.js';
 
 type QueryParams = Record<string, string>;
 
@@ -47,6 +48,9 @@ async function ensureContactVisible(
 
 export async function contactRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', authMiddleware);
+  // RBAC baseline: mọi endpoint contacts yêu cầu ít nhất contact.access.
+  // Route nào cần quyền mạnh hơn sẽ khai báo thêm preHandler riêng (vd delete).
+  app.addHook('preHandler', requireGrant('contact', 'access'));
 
   // ── GET /api/v1/contacts — list with filters and pagination ───────────────
   app.get('/api/v1/contacts', async (request: FastifyRequest, reply: FastifyReply) => {
@@ -629,10 +633,7 @@ export async function contactRoutes(app: FastifyInstance): Promise<void> {
   // ── DELETE /api/v1/contacts/:id ───────────────────────────────────────────
   // RBAC Phase Phân Quyền 2026-05-21: require contact.delete grant
   app.delete('/api/v1/contacts/:id', {
-    preHandler: async (request, reply) => {
-      const { requireGrant } = await import('../rbac/rbac-middleware.js');
-      return requireGrant('contact', 'delete')(request, reply);
-    },
+    preHandler: requireGrant('contact', 'delete'),
     config: { contentClass: 'mixed', rbacResource: 'contact', rbacAction: 'delete' },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
@@ -736,7 +737,7 @@ export async function contactRoutes(app: FastifyInstance): Promise<void> {
           action: 'duplicate_group_dismissed', entityType: 'duplicate_group', entityId: groupId,
           details: { contactIds: group.contactIds, matchType: group.matchType },
         },
-      }).catch(() => {});
+      }).catch(() => { });
       return reply.send({ dismissed: true });
     } catch (err) {
       logger.error('[contacts] Dismiss duplicate error:', err);
@@ -1275,7 +1276,7 @@ export async function contactRoutes(app: FastifyInstance): Promise<void> {
               ...(body.zaloUsername ? { zaloUsername: body.zaloUsername } : {}),
               hasZalo: true,
             },
-          }).catch(() => {});
+          }).catch(() => { });
         }
 
         // Upsert Friend cho cặp (nick, uid) — commitment thực sự

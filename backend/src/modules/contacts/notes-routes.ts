@@ -13,9 +13,10 @@ import { prisma } from '../../shared/database/prisma-client.js';
 import { authMiddleware } from '../auth/auth-middleware.js';
 import { logger } from '../../shared/utils/logger.js';
 import { parseAppointmentFromText } from '../ai/ai-service.js';
+import { requireGrant } from '../rbac/rbac-middleware.js';
 
 const NOTE_INCLUDE = {
-  author:    { select: { id: true, fullName: true, email: true } },
+  author: { select: { id: true, fullName: true, email: true } },
   reactions: {
     select: { id: true, emoji: true, userId: true, user: { select: { fullName: true } } },
   },
@@ -24,6 +25,7 @@ const NOTE_INCLUDE = {
 
 export async function notesRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', authMiddleware);
+  app.addHook('preHandler', requireGrant('contact', 'access'));
 
   // ── GET /api/v1/contacts/:contactId/notes ─────────────────────────────────
   // Returns root notes (parentNoteId IS NULL) newest first, each with replies
