@@ -314,7 +314,7 @@ describe('sendMessageHandler group target with template', () => {
       'nick-1',
       'group-123',
       1,
-      { msg: 'Nhân dịp sinh nhật của Anh, kính chúc Anh luôn / dẫn dắt Don vi A phát triển vững mạnh,' },
+      { msg: 'Nhân dịp sinh nhật của Anh, kính chúc Anh luôn / đồng hành cùng Don vi A phát triển vững mạnh,' },
     );
   });
 
