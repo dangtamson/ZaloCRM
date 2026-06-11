@@ -350,7 +350,7 @@ const BIRTHDAY_VNPT_KDGP_SVG_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg"
     <style>
       .serif { font-family: 'Times New Roman', Georgia, serif; }
       .script { font-family: 'Brush Script MT', 'Segoe Script', cursive; font-style: italic; }
-      .name { fill: #0156d0; font-size: 90px; font-weight: 700; letter-spacing: 0.5px; }
+      .name { fill: #0156d0; font-size: 50px; font-weight: 700; letter-spacing: 0.5px; }
       .unit { fill: #f6c86b; font-size: 40px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
       .dob { fill: #06184a; font-size: 46px; font-weight: 700; letter-spacing: 6px; }
       .message { fill: #071d63; font-size: 24px; font-style: italic; }
