@@ -229,6 +229,7 @@ function buildTemplateContact(
 }
 
 export async function sendMessageHandler(ctx: ActionContext): Promise<ActionResult> {
+  console.error('[sendMessageHandler] ENTRY', { contactId: ctx.contactId, actionType: ctx.actionType });
   const snap = ctx.blockSnapshot as {
     textVariants?: string[];
     attachments?: MessageAttachmentSnapshot[];
@@ -240,6 +241,7 @@ export async function sendMessageHandler(ctx: ActionContext): Promise<ActionResu
     __templateContactOverride?: Record<string, unknown>;
     __templateContactOverrides?: Array<Record<string, unknown>>;
   };
+  console.error('[sendMessageHandler] snap loaded', { hasHtmlImageTemplate: !!snap.htmlImageTemplate, htmlContent: snap.htmlImageTemplate?.html?.substring(0, 50) });
 
   if (!Array.isArray(snap.textVariants) || snap.textVariants.length === 0) {
     return {
@@ -311,7 +313,9 @@ export async function sendMessageHandler(ctx: ActionContext): Promise<ActionResu
   }
 
   // ── HTML template image rendering (optional) ─────────────────────────────
+  logger.debug('[send-message] check htmlImageTemplate', { hasHtml: !!snap.htmlImageTemplate?.html, failOpen: snap.htmlImageTemplate?.failOpen });
   if (snap.htmlImageTemplate?.html) {
+    logger.info('[send-message] rendering HTML image template');
     const failOpen = snap.htmlImageTemplate.failOpen !== false;
     try {
       const contactsForImageRender = templateContactOverrides.length > 0
