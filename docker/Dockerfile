@@ -17,7 +17,8 @@ RUN npm run build
 
 # ── Stage 3: Production image ────────────────────────────────────────────────
 FROM node:20-alpine
-RUN apk add --no-cache tini ffmpeg fontconfig ttf-dejavu
+RUN apk add --no-cache tini ffmpeg fontconfig ttf-dejavu tzdata
+ENV TZ=Asia/Ho_Chi_Minh
 WORKDIR /app
 
 # Copy built artefacts
