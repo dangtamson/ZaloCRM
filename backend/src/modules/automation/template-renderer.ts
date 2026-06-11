@@ -112,7 +112,13 @@ const TEMPLATE_VARIABLES: Record<string, (context: AutomationTemplateContext) =>
 export const AVAILABLE_VARIABLES: string[] = Object.keys(TEMPLATE_VARIABLES);
 
 export function renderMessageTemplate(content: string, context: AutomationTemplateContext): string {
-  return content.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match, token: string) => {
+  // Some persisted payloads may escape template braces (e.g. \{\{token\}\}).
+  // Normalize first so Docker/prod and dev render paths behave the same.
+  const normalized = content
+    .replace(/\\\{\\\{/g, '{{')
+    .replace(/\\\}\\\}/g, '}}');
+
+  return normalized.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_match, token: string) => {
     const resolver = TEMPLATE_VARIABLES[token];
     return resolver ? resolver(context) : '';
   });
