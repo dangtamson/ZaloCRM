@@ -36,10 +36,10 @@ export async function renderHtmlTemplateToImage(
 ): Promise<HtmlImageTemplateResult> {
     const width = clampInt(input.width, 320, 3000, 768);
     const height = clampInt(input.height, 320, 4000, 1152);
-    const renderedMarkup = (await rewriteAutomationAssetHrefs(renderMessageTemplate(
+    const renderedMarkup = normalizeSvgAttributes((await rewriteAutomationAssetHrefs(renderMessageTemplate(
         input.htmlTemplate,
         escapeTemplateContext(input.context),
-    ))).trim();
+    )))).trim();
 
     if (!renderedMarkup) {
         throw new Error('htmlImageTemplate.html rendered empty');
@@ -70,6 +70,14 @@ export async function renderHtmlTemplateToImage(
         filePath,
         url: `${origin}${publicPrefix}/${orgSegment}/${fileName}`,
     };
+}
+
+function normalizeSvgAttributes(markup: string): string {
+    // Resvg is stricter than browser parsers. Normalize common operator input
+    // where attributes are unquoted (e.g. xmlns=http://..., width=768).
+    return markup.replace(/(<[^>]+>)/g, (tag) => (
+        tag.replace(/(\s[\w:-]+)=([^\s"'`=<>]+)/g, '$1="$2"')
+    ));
 }
 
 function getStorageRoot(): string {
