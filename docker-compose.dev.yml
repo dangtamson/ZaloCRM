@@ -11,6 +11,8 @@ services:
       POSTGRES_USER: crmuser
       POSTGRES_PASSWORD: devpassword
       POSTGRES_DB: zalocrm
+      TZ: Asia/Ho_Chi_Minh
+      PGTZ: Asia/Ho_Chi_Minh
     ports:
       - "5433:5432"
     volumes:
@@ -20,6 +22,9 @@ services:
       interval: 5s
       timeout: 3s
       retries: 3
+    command: >
+      postgres
+      -c timezone=Asia/Ho_Chi_Minh
 
 volumes:
   pg_data_dev:

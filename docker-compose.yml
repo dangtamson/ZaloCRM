@@ -13,6 +13,7 @@ services:
       - .env
     environment:
       - NODE_ENV=production
+      - TZ=Asia/Ho_Chi_Minh
       - DATABASE_URL=postgresql://${DB_USER:-crmuser}:${DB_PASSWORD}@db:5432/${DB_NAME:-zalocrm}
       - S3_ENDPOINT=${S3_ENDPOINT:-http://minio:9000}
       - S3_PUBLIC_URL=${S3_PUBLIC_URL:-http://localhost:9000}
@@ -43,6 +44,8 @@ services:
       POSTGRES_USER: ${DB_USER:-crmuser}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME:-zalocrm}
+      TZ: Asia/Ho_Chi_Minh
+      PGTZ: Asia/Ho_Chi_Minh
     volumes:
       - pg_data:/var/lib/postgresql/data
     ports:
@@ -54,6 +57,7 @@ services:
       retries: 5
     command: >
       postgres
+      -c timezone=Asia/Ho_Chi_Minh
       -c shared_buffers=128MB
       -c effective_cache_size=256MB
       -c max_connections=50
