@@ -4,6 +4,7 @@ import { logger } from '../../shared/utils/logger.js';
 import { getProviderConfig, getAvailableProviders } from './provider-registry.js';
 import { generateWithAnthropic } from './providers/anthropic.js';
 import { generateWithGemini } from './providers/gemini.js';
+import { generateWithOllamaNative } from './providers/ollama-native.js';
 import { generateWithOpenaiCompat } from './providers/openai-compat.js';
 import { buildReplyDraftPrompt } from './prompts/reply-draft.js';
 import { buildSummaryPrompt } from './prompts/summary.js';
@@ -166,7 +167,18 @@ async function generateText(orgId: string, provider: string, apiKey: string, mod
   /* OpenAI, Qwen, Kimi all use OpenAI-compatible chat/completions API */
   if (provider === 'openai') return generateWithOpenaiCompat(`${baseUrl}/v1/chat/completions`, apiKey, model, system, prompt, maxTokens);
   if (provider === 'openapi') return generateWithOpenaiCompat(`${baseUrl}/chat/completions`, apiKey, model, system, prompt, maxTokens);
-  if (provider === 'ollama') return generateWithOpenaiCompat(`${baseUrl}/chat/completions`, apiKey, model, system, prompt, maxTokens);
+  if (provider === 'ollama') {
+    try {
+      return await generateWithOpenaiCompat(`${baseUrl}/chat/completions`, apiKey, model, system, prompt, maxTokens);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      // Some gateways expose only native /generate (no OpenAI compatibility).
+      if (message.includes('status 404') || message.includes('status 405')) {
+        return generateWithOllamaNative(`${baseUrl}/generate`, model, system, prompt, maxTokens);
+      }
+      throw err;
+    }
+  }
   if (provider === 'qwen') return generateWithOpenaiCompat(`${baseUrl}/compatible-mode/v1/chat/completions`, apiKey, model, system, prompt, maxTokens);
   if (provider === 'kimi') return generateWithOpenaiCompat(`${baseUrl}/v1/chat/completions`, apiKey, model, system, prompt, maxTokens);
 
@@ -533,7 +545,7 @@ export async function aiFormatRichText(input: { orgId: string; rawText: string }
       type: 'reply_draft',                // reuse type để tránh schema migration
       content: JSON.stringify({ kind: 'format_rich', styles }),
       confidence: 0.85,
-    }).catch(() => {});
+    }).catch(() => { });
 
     return { text, styles, source: 'ai' };
   } catch (err) {
