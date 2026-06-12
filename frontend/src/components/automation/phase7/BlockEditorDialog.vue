@@ -319,8 +319,8 @@ const BIRTHDAY_CARD_KDGP_BACKGROUND_HREF = '/automation-assets/image/hpbdkdgp.pn
 const BIRTHDAY_VNPT_SVG_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1280" viewBox="0 0 960 1280">
   <defs>
     <style>
-      .serif { font-family: 'Times New Roman', Georgia, serif; }
-      .script { font-family: 'Brush Script MT', 'Segoe Script', cursive; font-style: italic; }
+      .serif { font-family: 'Liberation Serif', 'DejaVu Serif', Georgia, serif; }
+      .script { font-family: 'Liberation Serif', 'DejaVu Serif', Georgia, serif; font-style: italic; font-weight: 600; }
       .name { fill: #8a5b14; font-size: 64px; }
       .unit { fill: #ffffff; font-size: 30px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
       .dob { fill: #06184a; font-size: 43px; font-weight: 700; letter-spacing: 8px; }
@@ -348,8 +348,8 @@ const BIRTHDAY_VNPT_SVG_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg" widt
 const BIRTHDAY_VNPT_KDGP_SVG_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="1280" viewBox="0 0 960 1280">
   <defs>
     <style>
-      .serif { font-family: 'Times New Roman', Georgia, serif; }
-      .script { font-family: 'Brush Script MT', 'Segoe Script', cursive; font-style: italic; }
+      .serif { font-family: 'Liberation Serif', 'DejaVu Serif', Georgia, serif; }
+      .script { font-family: 'Liberation Serif', 'DejaVu Serif', Georgia, serif; font-style: italic; font-weight: 600; }
       .name { fill: #0156d0; font-size: 70px; font-weight: 700; letter-spacing: 0.5px; }
       .unit { fill: #f6c86b; font-size: 40px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
       .dob { fill: #06184a; font-size: 46px; font-weight: 700; letter-spacing: 6px; }
