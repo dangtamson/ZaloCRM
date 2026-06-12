@@ -17,7 +17,7 @@ RUN npm run build
 
 # ── Stage 3: Production image ────────────────────────────────────────────────
 FROM node:20-alpine
-RUN apk add --no-cache tini ffmpeg fontconfig ttf-dejavu ttf-liberation ttf-liberation-mono tzdata
+RUN apk add --no-cache tini ffmpeg fontconfig ttf-dejavu ttf-liberation tzdata
 ENV TZ=Asia/Ho_Chi_Minh
 WORKDIR /app
 
