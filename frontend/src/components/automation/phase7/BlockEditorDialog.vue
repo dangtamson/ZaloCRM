@@ -321,10 +321,10 @@ const BIRTHDAY_VNPT_SVG_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg" widt
     <style>
       .serif { font-family: 'Liberation Serif', 'DejaVu Serif', Georgia, serif; }
       .script { font-family: 'Liberation Serif', 'DejaVu Serif', Georgia, serif; font-style: italic; font-weight: 600; }
-      .name { fill: #8a5b14; font-size: 64px; }
+      .name { fill: #8a5b14; font-size: 60px; }
       .unit { fill: #ffffff; font-size: 30px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
       .dob { fill: #06184a; font-size: 43px; font-weight: 700; letter-spacing: 8px; }
-      .message { fill: #0b1f5f; font-size: 25px; font-style: italic; }
+      .message { fill: #0b1f5f; font-size: 23px; font-style: italic; }
     </style>
   </defs>
   <image href="${BIRTHDAY_CARD_BACKGROUND_HREF}" x="0" y="0" width="960" height="1280" preserveAspectRatio="none"/>
@@ -350,10 +350,10 @@ const BIRTHDAY_VNPT_KDGP_SVG_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg"
     <style>
       .serif { font-family: 'Liberation Serif', 'DejaVu Serif', Georgia, serif; }
       .script { font-family: 'Liberation Serif', 'DejaVu Serif', Georgia, serif; font-style: italic; font-weight: 600; }
-      .name { fill: #0156d0; font-size: 70px; font-weight: 700; letter-spacing: 0.5px; }
+      .name { fill: #0156d0; font-size: 65px; font-weight: 700; letter-spacing: 0.5px; }
       .unit { fill: #f6c86b; font-size: 40px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
       .dob { fill: #06184a; font-size: 46px; font-weight: 700; letter-spacing: 6px; }
-      .message { fill: #071d63; font-size: 24px; font-style: italic; }
+      .message { fill: #071d63; font-size: 22px; font-style: italic; }
     </style>
   </defs>
   <image href="${BIRTHDAY_CARD_KDGP_BACKGROUND_HREF}" x="0" y="0" width="960" height="1280" preserveAspectRatio="none"/>
