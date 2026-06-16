@@ -36,6 +36,7 @@ import type { BlockActionType } from '../blocks/types.js';
 import { normalizeSendMessageTargets } from './send-message-targets.js';
 import { applySendMessageTargetOverrides } from './send-message-trigger-targets.js';
 import { notifyAutomationRunTelegram } from './automation-telegram-notifier.js';
+import { resolveAutomationTaskContactId } from './task-contact-resolution.js';
 
 // ── Worker config ─────────────────────────────────────────────────────────
 
@@ -469,17 +470,18 @@ async function markDoneAndAdvance(
   const jitterMax = (rules.randomDelayPerSend?.max ?? 0) * 60 * 1000;
   const jitter = jitterMin + Math.random() * Math.max(0, jitterMax - jitterMin);
   const scheduledAt = new Date(now.getTime() + nextStep.delayMinutes * 60 * 1000 + jitter);
+  const blockSnapshot = applySendMessageTargetOverrides(block.content, rules) as object;
 
   await prisma.automationTask.create({
     data: {
       id: randomUUID(),
       orgId: task.orgId,
       campaignId: task.campaignId,
-      contactId: task.contactId,
+      contactId: resolveAutomationTaskContactId(blockSnapshot, task.contactId),
       sequenceId: task.sequenceId,
       currentStepIdx: nextIdx,
       currentBlockId: block.id,
-      blockSnapshot: applySendMessageTargetOverrides(block.content, rules) as object,
+      blockSnapshot,
       scheduledAt,
       state: TASK_STATES.QUEUED,
     },

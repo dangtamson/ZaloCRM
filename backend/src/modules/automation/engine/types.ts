@@ -11,13 +11,15 @@ import type { TriggerEventType } from '../triggers/types.js';
 // manual_run is emitted (by API endpoint).
 
 export interface AutomationEvent<T = unknown> {
+  [key: string]: unknown;
+  id?: string;
   type: TriggerEventType;
   orgId: string;
   occurredAt: Date;
   // Either an explicit contact (for KH-scoped events) or a segment hint
   // (for cron / scheduled events where engine queries contacts itself).
   contactId?: string;
-  segmentHint?: { kind: 'all' | 'import-batch' | 'filter'; [key: string]: unknown };
+  segmentHint?: { kind: 'all' | 'import-batch' | 'filter';[key: string]: unknown };
   // Event-specific payload — filterable via Trigger.eventFilter
   payload?: T;
 }

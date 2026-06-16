@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto';
 import { prisma } from '../../../shared/database/prisma-client.js';
 import { logger } from '../../../shared/utils/logger.js';
 import { sanitizeContactCriteria, sanitizeManualContactIds } from '../engine/segment-sanitizer.js';
+import { resolveAutomationTaskContactId } from '../engine/task-contact-resolution.js';
 
 function getBirthdayWeekMonthDayKeys(now: Date): Set<number> {
   const day = now.getDay();
@@ -115,13 +116,14 @@ export async function resolveAndEnqueue(bc: BroadcastRow): Promise<{ recipients:
 
   const tasksData = recipientIds.map((contactId) => {
     const jitterMs = (delay.min + Math.random() * Math.max(0, delay.max - delay.min)) * 60 * 1000;
+    const blockSnapshot = block.content as object;
     return {
       id: randomUUID(),
       orgId: bc.orgId,
       campaignId: campaign.id,
-      contactId,
+      contactId: resolveAutomationTaskContactId(blockSnapshot, contactId),
       currentBlockId: bc.blockId,
-      blockSnapshot: block.content as object,
+      blockSnapshot,
       scheduledAt: new Date(now + jitterMs),
       state: 'queued',
     };
