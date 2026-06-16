@@ -226,6 +226,14 @@
             </select>
           </div>
 
+          <div v-if="draft.bindingKind === 'block'" class="form-field">
+            <label class="form-label">Chống trùng trong block campaign</label>
+            <label class="form-toggle">
+              <input type="checkbox" v-model="triggerDedupBlockCampaign" />
+              <span>Bật kiểm tra "already in block campaign" (mặc định bật)</span>
+            </label>
+          </div>
+
           <div v-if="showSendMessageTargetsConfig" class="form-field trigger-targets">
             <label class="form-label">Người nhận tin nhắn</label>
             <p class="at-caption form-hint">
@@ -449,6 +457,7 @@ const triggerGroupTargets = ref<Array<{ accountId: string; groupId: string }>>([
 const triggerUserTargets = ref<Array<{ accountId: string; contactId: string }>>([{ accountId: '', contactId: '' }]);
 const triggerTelegramIntegrationId = ref('');
 const triggerRuleOverridesBase = ref<Record<string, unknown>>({});
+const triggerDedupBlockCampaign = ref(true);
 
 const availableCategories = computed(() => {
   const present = new Set(catalog.value.map((c) => c.category));
@@ -589,6 +598,7 @@ function openCreateFromCatalog(entry: TriggerCatalogEntry) {
   segmentBirthdayThisWeek.value = false;
   segmentBirthdayToday.value = false;
   triggerRuleOverridesBase.value = {};
+  triggerDedupBlockCampaign.value = true;
   triggerTelegramIntegrationId.value = '';
   resetTriggerTargets();
   editorOpen.value = true;
@@ -618,6 +628,16 @@ function openEdit(trig: AutomationTrigger) {
     segmentCustomerListId.value = '';
     segmentBirthdayThisWeek.value = false;
     segmentBirthdayToday.value = false;
+  }
+  if (
+    trig.ruleOverrides
+    && typeof trig.ruleOverrides === 'object'
+    && !Array.isArray(trig.ruleOverrides)
+    && typeof (trig.ruleOverrides as Record<string, unknown>).dedupBlockCampaign === 'boolean'
+  ) {
+    triggerDedupBlockCampaign.value = Boolean((trig.ruleOverrides as Record<string, unknown>).dedupBlockCampaign);
+  } else {
+    triggerDedupBlockCampaign.value = true;
   }
   readTriggerTargetsFromRuleOverrides(trig.ruleOverrides);
   readTelegramNotificationFromRuleOverrides(trig.ruleOverrides);
@@ -730,6 +750,8 @@ function readTelegramNotificationFromRuleOverrides(ruleOverrides: Record<string,
 
 function buildRuleOverridesPayload() {
   const out: Record<string, unknown> = { ...triggerRuleOverridesBase.value };
+  if (draft.value?.bindingKind === 'block') out.dedupBlockCampaign = triggerDedupBlockCampaign.value;
+  else delete out.dedupBlockCampaign;
   if (draft.value?.eventType === 'scheduled_cron' && triggerTelegramIntegrationId.value.trim()) {
     out.telegramMessageTarget = { integrationId: triggerTelegramIntegrationId.value.trim() };
   } else {
