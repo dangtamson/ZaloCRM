@@ -20,6 +20,7 @@ import { DEFAULT_RUNTIME_RULES, type SequenceStep } from '../sequences/types.js'
 import type { AutomationEvent } from './types.js';
 import { sanitizeContactCriteria, sanitizeManualContactIds } from './segment-sanitizer.js';
 import { applySendMessageTargetOverrides } from './send-message-trigger-targets.js';
+import { resolveAutomationTaskContactId } from './task-contact-resolution.js';
 import { notifyAutomationRunTelegram } from './automation-telegram-notifier.js';
 
 const VN_TIMEZONE = 'Asia/Ho_Chi_Minh';
@@ -111,6 +112,12 @@ function buildTaskBlockSnapshot(
   return snapshot;
 }
 
+function shouldDedupBlockCampaign(ruleOverrides: unknown): boolean {
+  if (!ruleOverrides || typeof ruleOverrides !== 'object' || Array.isArray(ruleOverrides)) return true;
+  const dedup = (ruleOverrides as Record<string, unknown>).dedupBlockCampaign;
+  return dedup !== false;
+}
+
 function hasHtmlImageTemplate(content: unknown): boolean {
   if (!content || typeof content !== 'object' || Array.isArray(content)) return false;
   const template = (content as Record<string, unknown>).htmlImageTemplate;
@@ -135,9 +142,9 @@ function getPayloadTriggerId(payload: unknown): string | undefined {
 function isCustomerListSegment(spec: unknown): boolean {
   return Boolean(
     spec
-      && typeof spec === 'object'
-      && !Array.isArray(spec)
-      && (spec as Record<string, unknown>).kind === 'customer-list',
+    && typeof spec === 'object'
+    && !Array.isArray(spec)
+    && (spec as Record<string, unknown>).kind === 'customer-list',
   );
 }
 
@@ -535,14 +542,23 @@ export async function materializeFromEvent(
 
       if (hasHtmlImageTemplate(block.content) && groupedTemplateProfiles.length > 0) {
         const groupedContactId = contactIds[0];
-        const existing = await prisma.automationTask.findFirst({
-          where: { campaignId: blockCampaign.id, contactId: groupedContactId },
-          select: { id: true },
-        });
-        if (existing) {
-          result.skipped++;
-          result.reasons.push(`contact ${groupedContactId}: already in block campaign ${blockCampaign.id}`);
-          continue;
+        const blockSnapshot = buildTaskBlockSnapshot(
+          block.content,
+          groupedTemplateProfiles[0],
+          groupedTemplateProfiles,
+          trigger.ruleOverrides,
+        );
+        const resolvedContactId = resolveAutomationTaskContactId(blockSnapshot, groupedContactId);
+        if (shouldDedupBlockCampaign(trigger.ruleOverrides)) {
+          const existing = await prisma.automationTask.findFirst({
+            where: { campaignId: blockCampaign.id, contactId: resolvedContactId },
+            select: { id: true },
+          });
+          if (existing) {
+            result.skipped++;
+            result.reasons.push(`contact ${groupedContactId}: already in block campaign ${blockCampaign.id}`);
+            continue;
+          }
         }
         const jitter = jitterMin + Math.random() * Math.max(0, jitterMax - jitterMin);
         const scheduledAt = new Date(baseNow + jitter);
@@ -551,14 +567,9 @@ export async function materializeFromEvent(
             id: randomUUID(),
             orgId: event.orgId,
             campaignId: blockCampaign.id,
-            contactId: groupedContactId,
+            contactId: resolvedContactId,
             currentBlockId: block.id,
-            blockSnapshot: buildTaskBlockSnapshot(
-              block.content,
-              groupedTemplateProfiles[0],
-              groupedTemplateProfiles,
-              trigger.ruleOverrides,
-            ),
+            blockSnapshot,
             scheduledAt,
             state: 'queued',
           },
@@ -568,14 +579,23 @@ export async function materializeFromEvent(
       }
 
       for (const contactId of contactIds) {
-        const existing = await prisma.automationTask.findFirst({
-          where: { campaignId: blockCampaign.id, contactId },
-          select: { id: true },
-        });
-        if (existing) {
-          result.skipped++;
-          result.reasons.push(`contact ${contactId}: already in block campaign ${blockCampaign.id}`);
-          continue;
+        const blockSnapshot = buildTaskBlockSnapshot(
+          block.content,
+          segmentResolution.templateProfileByContactId.get(contactId),
+          undefined,
+          trigger.ruleOverrides,
+        );
+        const resolvedContactId = resolveAutomationTaskContactId(blockSnapshot, contactId);
+        if (shouldDedupBlockCampaign(trigger.ruleOverrides)) {
+          const existing = await prisma.automationTask.findFirst({
+            where: { campaignId: blockCampaign.id, contactId: resolvedContactId },
+            select: { id: true },
+          });
+          if (existing) {
+            result.skipped++;
+            result.reasons.push(`contact ${contactId}: already in block campaign ${blockCampaign.id}`);
+            continue;
+          }
         }
         const jitter = jitterMin + Math.random() * Math.max(0, jitterMax - jitterMin);
         const scheduledAt = new Date(baseNow + jitter);
@@ -584,15 +604,10 @@ export async function materializeFromEvent(
             id: randomUUID(),
             orgId: event.orgId,
             campaignId: blockCampaign.id,
-            contactId,
+            contactId: resolvedContactId,
             // No sequence — block-bound tasks have currentStepIdx=null
             currentBlockId: block.id,
-            blockSnapshot: buildTaskBlockSnapshot(
-              block.content,
-              segmentResolution.templateProfileByContactId.get(contactId),
-              undefined,
-              trigger.ruleOverrides,
-            ),
+            blockSnapshot,
             scheduledAt,
             state: 'queued',
           },
@@ -696,8 +711,15 @@ export async function materializeFromEvent(
     // 7. For each contact: idempotent enrollment — skip if already has task for this campaign
     const now = Date.now();
     for (const contactId of contactIds) {
+      const blockSnapshot = buildTaskBlockSnapshot(
+        firstBlock.content,
+        segmentResolution.templateProfileByContactId.get(contactId),
+        undefined,
+        trigger.ruleOverrides,
+      );
+      const resolvedContactId = resolveAutomationTaskContactId(blockSnapshot, contactId);
       const existing = await prisma.automationTask.findFirst({
-        where: { campaignId: campaign.id, contactId },
+        where: { campaignId: campaign.id, contactId: resolvedContactId },
         select: { id: true },
       });
       if (existing) {
@@ -717,16 +739,11 @@ export async function materializeFromEvent(
           id: randomUUID(),
           orgId: event.orgId,
           campaignId: campaign.id,
-          contactId,
+          contactId: resolvedContactId,
           sequenceId: trigger.sequenceId,
           currentStepIdx: 0,
           currentBlockId: firstBlock.id,
-          blockSnapshot: buildTaskBlockSnapshot(
-            firstBlock.content,
-            segmentResolution.templateProfileByContactId.get(contactId),
-            undefined,
-            trigger.ruleOverrides,
-          ), // SNAPSHOT — frozen content
+          blockSnapshot, // SNAPSHOT — frozen content
           scheduledAt,
           state: 'queued',
         },

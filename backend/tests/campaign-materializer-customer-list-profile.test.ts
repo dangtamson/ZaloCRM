@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const prismaMock = {
@@ -499,8 +500,15 @@ describe('campaign materializer customer-list profile templates', () => {
     });
 
     expect(result.tasksEnqueued).toBe(1);
+    expect(prismaMock.automationTask.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        campaignId: 'campaign-1',
+        contactId: 'contact-user',
+      }),
+    }));
     expect(prismaMock.automationTask.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
+        contactId: 'contact-user',
         blockSnapshot: expect.objectContaining({
           telegramMessageTarget: { integrationId: 'telegram-1' },
           groupTargets: [{ accountId: 'nick-trigger', groupId: 'group-trigger' }],
@@ -510,5 +518,52 @@ describe('campaign materializer customer-list profile templates', () => {
     });
     const snapshot = prismaMock.automationTask.create.mock.calls[0][0].data.blockSnapshot;
     expect(snapshot.groupTarget).toBeUndefined();
+  });
+
+  it('can disable block campaign dedup via ruleOverrides', async () => {
+    prismaMock.automationTrigger.findMany.mockResolvedValueOnce([
+      {
+        id: 'trigger-1',
+        eventType: 'scheduled_cron',
+        enabled: true,
+        bindingKind: 'block',
+        blockId: 'block-1',
+        eventFilter: null,
+        segmentSpec: { kind: 'customer-list', listId: 'list-1', birthdayThisWeek: true },
+        ruleOverrides: {
+          dedupBlockCampaign: false,
+          sendMessageTargets: {
+            userTargets: [{ accountId: 'nick-user', contactId: 'contact-user' }],
+          },
+        },
+        sequenceId: null,
+        sequence: null,
+      },
+    ]);
+
+    prismaMock.block.findFirst.mockResolvedValueOnce({
+      id: 'block-1',
+      content: {
+        textVariants: ['Chuc mung {{contact.fullName}}'],
+      },
+      archivedAt: null,
+    });
+
+    prismaMock.automationTask.findFirst.mockResolvedValueOnce({ id: 'existing-task' });
+
+    const result = await materializeFromEvent({
+      orgId: 'org-1',
+      type: 'scheduled_cron',
+      occurredAt: new Date('2026-06-08T02:00:00.000Z'),
+      payload: { triggerId: 'trigger-1' },
+    });
+
+    expect(result.tasksEnqueued).toBe(1);
+    expect(prismaMock.automationTask.findFirst).toHaveBeenCalledTimes(0);
+    expect(prismaMock.automationTask.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        contactId: 'contact-user',
+      }),
+    });
   });
 });
