@@ -2188,7 +2188,7 @@ Send a message through a **connected Zalo account** of the organization.
 {
   "zaloAccountId": "zalo-acc-123",
   "threadId": "zalo-uid-or-group-id",
-  "content": "Hello from ZaloCRM!",
+  "content": "Hello from ZCRM!",
   "threadType": "user"
 }
 ```

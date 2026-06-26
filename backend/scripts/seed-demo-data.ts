@@ -12,6 +12,7 @@
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcryptjs';
+import { randomUUID } from 'node:crypto';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
@@ -25,7 +26,7 @@ const HO = ['Nguyễn', 'Trần', 'Lê', 'Phạm', 'Hoàng', 'Huỳnh', 'Phan', 
 const DEM = ['Văn', 'Thị', 'Hữu', 'Đức', 'Minh', 'Thanh', 'Quốc', 'Hồng', 'Ngọc', 'Gia', 'Tuấn', 'Thu'];
 const TEN = ['An', 'Bình', 'Cường', 'Dũng', 'Em', 'Phúc', 'Giang', 'Hà', 'Hải', 'Khoa', 'Lan', 'Linh', 'Mai', 'Nam', 'Oanh', 'Phương', 'Quân', 'Sơn', 'Trang', 'Uyên', 'Vy', 'Yến', 'Bảo', 'Châu', 'Đạt', 'Hùng', 'Kiên', 'Loan', 'My', 'Như'];
 const PROVINCES = ['Hà Nội', 'TP. Hồ Chí Minh', 'Đà Nẵng', 'Hải Phòng', 'Cần Thơ', 'Bình Dương', 'Đồng Nai', 'Nghệ An'];
-const SOURCES = ['FB', 'TT', 'GT', 'CN', 'zalo', 'phone_import'];
+const SOURCES = ['FB', 'TT', 'GT', 'CN', 'zalo'];
 const STATUSES = ['new', 'contacted', 'interested', 'converted', 'lost'];
 const CRM_TAGS = ['vip', 'tiem-nang', 'quan-tam', 'cho-bao-gia', 'da-chot', 'kho-tinh'];
 
@@ -93,7 +94,7 @@ async function main() {
           orgId: ORG_ID,
           fullName: name,
           phone,
-          email: `nv${empSeq}.demo@thienphuc.vn`,
+          email: `nv${empSeq}.demo@locnguyendata.com`,
           passwordHash,
           role: deptIdx === 0 ? 'admin' : 'member',
           isActive: true,
@@ -110,11 +111,13 @@ async function main() {
   // ── 3. ~120 khách hàng demo ────────────────────────────────────────
   console.log('→ Tạo 120 khách hàng demo...');
   const contactIds: string[] = [];
+  const contacts: { id: string; name: string }[] = [];
   for (let i = 1; i <= 120; i++) {
+    const cName = fullName();
     const c = await prisma.contact.create({
       data: {
         orgId: ORG_ID,
-        fullName: fullName(),
+        fullName: cName,
         phone: `09870${String(i).padStart(5, '0')}`,
         phoneNormalized: `84987${String(i).padStart(6, '0')}`,
         source: rand(SOURCES),
@@ -129,6 +132,7 @@ async function main() {
       },
     });
     contactIds.push(c.id);
+    contacts.push({ id: c.id, name: cName });
   }
 
   // ── 4. MARKETING — templates ───────────────────────────────────────
@@ -274,10 +278,187 @@ async function main() {
     console.log('  ⚠ Không có nick Zalo nào → bỏ qua care-sessions.');
   }
 
+  // ── 10. CHAT GIẢ + FRIEND + ENGAGEMENT + APPOINTMENTS ──────────────
+  // Cần nick Zalo connected. Ưu tiên env SEED_NICK_ID, fallback nick đã resolve ở mục 9.
+  const nickId = process.env.SEED_NICK_ID || nick?.id || null;
+  let nChat = 0, nMsg = 0, nFriend = 0, nEng = 0, nAppt = 0;
+  if (!nickId) {
+    console.log('  ⚠ Không có nick Zalo → bỏ qua chat/engagement/appointments.');
+  } else {
+    console.log('→ Tạo chat giả + friend + engagement cho ~60 KH...');
+    const chatContacts = contacts.slice(0, 60); // 60/120 contact có hội thoại
+
+    // Câu thoại tiếng Việt tự nhiên (xen kẽ sale=self / khách=contact)
+    const inboundLines = [
+      'Alo shop ơi, sản phẩm này còn hàng không ạ?',
+      'Cho mình hỏi giá bao nhiêu vậy ạ?',
+      'Mình quan tâm gói này, tư vấn giúp mình với ạ.',
+      'Có ship về tỉnh không shop?',
+      'Bên mình có ưu đãi gì cho khách mới không ạ?',
+      'Ok để mình suy nghĩ thêm rồi báo lại nhé.',
+      'Mình chốt đơn này nha, gửi số tài khoản giúp mình.',
+      'Cảm ơn bạn đã tư vấn nhiệt tình nha!',
+      'Bao giờ thì giao được vậy bạn?',
+      'Mình muốn xem thêm vài mẫu nữa được không?',
+    ];
+    const outboundLines = [
+      'Dạ em chào anh/chị ạ! Em là tư vấn viên bên Clarity, anh/chị cần em hỗ trợ gì ạ?',
+      'Dạ sản phẩm bên em còn hàng đầy đủ ạ, em gửi anh/chị bảng giá chi tiết nhé!',
+      'Dạ bên em đang có ưu đãi giảm 20% cho khách mới ạ, anh/chị tham khảo giúp em nhé!',
+      'Dạ bên em ship toàn quốc ạ, phí ship em hỗ trợ luôn cho mình ạ.',
+      'Dạ anh/chị cứ tham khảo thoải mái ạ, có gì em tư vấn thêm nhé!',
+      'Dạ em cảm ơn anh/chị đã tin tưởng Clarity ạ! Em lên đơn ngay cho mình nhé.',
+      'Dạ ưu đãi áp dụng đến cuối tuần này thôi ạ, anh/chị cân nhắc sớm giúp em nhé!',
+      'Dạ em gửi anh/chị số tài khoản và thông tin giao hàng ạ.',
+      'Dạ đơn của mình dự kiến giao trong 2-3 ngày ạ.',
+      'Dạ có gì cần hỗ trợ thêm anh/chị nhắn em nhé!',
+    ];
+
+    const NOW = Date.now();
+    const DAY = 86400000;
+
+    for (let i = 0; i < chatContacts.length; i++) {
+      const cc = chatContacts[i];
+      const saleUid = rand(saleUserIds);
+
+      // Số message 5..15, xen kẽ bắt đầu bằng khách (contact)
+      const msgCount = randInt(5, 15);
+      const firstAt = NOW - randInt(20, 30) * DAY;
+      const lastAt = NOW - randInt(0, 5) * DAY;
+      const span = Math.max(lastAt - firstAt, DAY);
+
+      // Conversation VIRTUAL
+      const externalThreadId = `virtual:${cc.id}:${nickId}`;
+      const conv = await prisma.conversation.create({
+        data: {
+          orgId: ORG_ID,
+          zaloAccountId: nickId,
+          contactId: cc.id,
+          threadType: 'user',
+          isVirtual: true,
+          externalThreadId,
+          lastMessageAt: new Date(lastAt),
+          unreadCount: randInt(0, 3),
+          isReplied: Math.random() < 0.7,
+          tab: 'main',
+        },
+      });
+      nChat++;
+
+      let totalInbound = 0, totalOutbound = 0;
+      let lastInboundPreview = '', lastOutboundPreview = '';
+      let lastInboundAt: Date | null = null, lastOutboundAt: Date | null = null;
+      for (let m = 0; m < msgCount; m++) {
+        const isContact = m % 2 === 0; // KH nhắn trước, xen kẽ
+        const sentAt = new Date(firstAt + Math.floor((span * (m + 1)) / (msgCount + 1)));
+        const content = isContact ? rand(inboundLines) : rand(outboundLines);
+        const senderType = isContact ? 'contact' : 'self';
+        const delivered = !isContact && Math.random() < 0.8;
+        const seen = !isContact && Math.random() < 0.6;
+        await prisma.message.create({
+          data: {
+            conversationId: conv.id,
+            zaloMsgId: `local:${randomUUID()}`,
+            senderType,
+            senderName: isContact ? cc.name : 'Đoàn Minh Thư',
+            content,
+            contentType: 'text',
+            isLocal: true,
+            sentVia: isContact ? 'user' : 'user',
+            sentAt,
+            deliveredAt: delivered ? sentAt : null,
+            seenAt: seen ? new Date(sentAt.getTime() + 60000) : null,
+          },
+        });
+        nMsg++;
+        if (isContact) { totalInbound++; lastInboundPreview = content; lastInboundAt = sentAt; }
+        else { totalOutbound++; lastOutboundPreview = content; lastOutboundAt = sentAt; }
+      }
+
+      // Friend row (unique: zaloAccountId + zaloUidInNick)
+      await prisma.friend.create({
+        data: {
+          orgId: ORG_ID,
+          contactId: cc.id,
+          zaloAccountId: nickId,
+          zaloUidInNick: `demo-uid-${i}`,
+          friendshipStatus: 'accepted',
+          hasConversation: true,
+          relationshipKind: 'friend',
+          zaloDisplayName: cc.name,
+          becameFriendAt: new Date(firstAt - DAY),
+          firstMessageAt: new Date(firstAt),
+          lastInboundAt,
+          lastOutboundAt,
+          lastInteractionAt: new Date(lastAt),
+          totalInbound,
+          totalOutbound,
+          lastInboundPreview: lastInboundPreview || null,
+          lastInboundType: lastInboundPreview ? 'text' : null,
+          lastOutboundPreview: lastOutboundPreview || null,
+          lastOutboundType: lastOutboundPreview ? 'text' : null,
+        },
+      });
+      nFriend++;
+
+      // ContactEngagementDaily — 5..20 ngày gần đây
+      const engDays = randInt(5, 20);
+      for (let d = 0; d < engDays; d++) {
+        const date = new Date(NOW - d * DAY);
+        date.setHours(0, 0, 0, 0);
+        const inb = randInt(0, 4);
+        await prisma.contactEngagementDaily.create({
+          data: {
+            orgId: ORG_ID,
+            contactId: cc.id,
+            date,
+            inboundMsgCount: inb,
+            outboundMsgCount: randInt(0, 4),
+            reactionCount: randInt(0, 2),
+            mediaShareCount: randInt(0, 1),
+            quoteReplyCount: randInt(0, 1),
+            customerInitiated: inb > 0 && Math.random() < 0.5,
+            dailyIntensity: randInt(0, 100),
+          },
+        });
+        nEng++;
+      }
+    }
+
+    // ── Appointments (~25) ──
+    console.log('→ Tạo ~25 lịch hẹn...');
+    const apptTypes = ['call', 'message', 'meeting', 'follow_up'];
+    const apptStatuses = ['scheduled', 'scheduled', 'completed', 'completed', 'cancelled', 'no_show'];
+    const apptLocations = ['Văn phòng Clarity', 'Quán cà phê Highlands', 'Online (Zalo)', 'Nhà khách hàng', 'Showroom'];
+    for (let i = 0; i < 25; i++) {
+      const cc = rand(chatContacts);
+      const dayOffset = randInt(-7, 14);
+      const date = new Date(NOW + dayOffset * DAY);
+      date.setHours(randInt(8, 17), rand([0, 30]), 0, 0);
+      await prisma.appointment.create({
+        data: {
+          orgId: ORG_ID,
+          contactId: cc.id,
+          assignedUserId: rand(saleUserIds),
+          appointmentDate: date,
+          title: `Gọi nhắc KH ${cc.name}`,
+          durationMin: rand([15, 30, 60]),
+          location: rand(apptLocations),
+          type: rand(apptTypes),
+          status: dayOffset < 0 ? rand(['completed', 'completed', 'cancelled', 'no_show']) : rand(apptStatuses),
+          notes: rand(['KH quan tâm sản phẩm, cần follow-up.', 'Nhắc khách chốt đơn cuối tuần.', 'Tư vấn gói nâng cấp.', 'Khách hẹn gọi lại buổi chiều.']),
+        },
+      });
+      nAppt++;
+    }
+    console.log(`   → ${nChat} hội thoại, ${nMsg} tin nhắn, ${nFriend} friend, ${nEng} engagement-daily, ${nAppt} lịch hẹn.`);
+  }
+
   console.log('\n✅ HOÀN TẤT seed demo:');
-  console.log(`   - 5 phòng ban, 30 nhân viên (mật khẩu: ${DEMO_PASSWORD}, login bằng phone 0901000001..030 hoặc email nvN.demo@thienphuc.vn)`);
+  console.log(`   - 5 phòng ban, 30 nhân viên (mật khẩu: ${DEMO_PASSWORD}, login bằng phone 0901000001..030 hoặc email nvN.demo@locnguyendata.com)`);
   console.log('   - 120 khách hàng demo');
   console.log('   - Marketing: 5 templates, 4 blocks, 3 sequences, 3 broadcasts, 4 triggers, ~12 care-sessions');
+  console.log(`   - Chat: ${nChat} hội thoại virtual, ${nMsg} tin nhắn, ${nFriend} friend, ${nEng} engagement-daily, ${nAppt} lịch hẹn`);
 }
 
 main()

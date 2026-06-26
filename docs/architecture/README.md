@@ -1,6 +1,6 @@
-# Kiến trúc code ZaloCRM
+# Kiến trúc code ZCRM
 
-Sơ đồ kiến trúc của ZaloCRM (fork `upstream` — CRM quản lý nhiều nick Zalo cá nhân trên 1 web app), tạo ngày **2026-06-16** bằng `/diagram`.
+Sơ đồ kiến trúc của ZCRM (fork `upstream` — CRM quản lý nhiều nick Zalo cá nhân trên 1 web app), tạo ngày **2026-06-16** bằng `/diagram`.
 
 Mỗi sơ đồ có bộ 3 file:
 - `.mmd` — nguồn Mermaid (sửa file này rồi re-render là cách cập nhật chuẩn).

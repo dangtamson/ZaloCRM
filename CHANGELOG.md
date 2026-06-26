@@ -1,6 +1,6 @@
 # Changelog
 
-Các thay đổi đáng chú ý của ZaloCRM. Theo [Semantic Versioning](https://semver.org/lang/vi/).
+Các thay đổi đáng chú ý của ZCRM. Theo [Semantic Versioning](https://semver.org/lang/vi/).
 
 > Các tag `v1.x`–`v3.3.x` là **lịch sử upstream** (locphamnguyen/ZaloCRM) — xem đầy đủ ở cuối file.
 > `v3.4.x` là dòng release hiện tại.
@@ -15,7 +15,7 @@ Các thay đổi đáng chú ý của ZaloCRM. Theo [Semantic Versioning](https:
 - **Nâng cao bảo mật** — access token ngắn + **refresh token rotation**, CSP + security headers, RBAC phòng ban/đội nhóm, audit log, Privacy PIN.
 - **Quét nhóm Zalo** — quét nhóm & danh sách thành viên (GroupMember/GroupScan) bằng worker nền, trong menu Marketing.
 - **Bộ báo cáo mới** — Tổng quan điều hành · Vận hành Nick Zalo · Hiệu suất Sale & Team · Tương tác khách hàng · Audit & Sức khoẻ hệ thống · **Phân tích nâng cao**.
-- **API hoàn chỉnh cho ZaloCRM Mobile App** — bộ REST API đầy đủ (auth, chat, contacts, lịch hẹn, báo cáo, push) phục vụ ứng dụng di động.
+- **API hoàn chỉnh cho ZCRM Mobile App** — bộ REST API đầy đủ (auth, chat, contacts, lịch hẹn, báo cáo, push) phục vụ ứng dụng di động.
 - **Cầu Zalo ↔ Telegram** — mirror tin nhắn **2 chiều** (vào/ra) + **media** (ảnh/video/audio/file, giữ tên file gốc), realtime + badge, chống lặp theo `msgId`.
 - **Chuông "đang theo dõi"** sau tên khách ở cột 2 chat (đồng bộ 3 nơi).
 - **Chat "Phạm vi làm việc":** scope trở thành điều kiện LOAD; mỗi lần gắn 1 card + nhóm "đã xong" thu gọn.
@@ -25,9 +25,9 @@ Các thay đổi đáng chú ý của ZaloCRM. Theo [Semantic Versioning](https:
 - **API:** Public REST API (X-API-Key) + tài liệu API (vi/en + Postman collection).
 
 ### Changed — Thay đổi / Giao diện
-- **Giấy phép → AGPL-3.0:** relicense sang GNU AGPL-3.0 (copyleft + §13 SaaS source-disclosure) + **dual-license thương mại** + điều khoản **trademark "ZaloCRM"**; SPDX header trên toàn bộ file nguồn; thêm CONTRIBUTING + DCO; link **"Mã nguồn"** ở trang login (tuân thủ §13).
+- **Giấy phép → AGPL-3.0:** relicense sang GNU AGPL-3.0 (copyleft + §13 SaaS source-disclosure) + **dual-license thương mại** + điều khoản **trademark "ZCRM"**; SPDX header trên toàn bộ file nguồn; thêm CONTRIBUTING + DCO; link **"Mã nguồn"** ở trang login (tuân thủ §13).
 - Hồ sơ KH dùng tag per-nick (TagV2); nút Hồ sơ ở trang Bạn bè mở popup.
-- Bộ nhận diện ZaloCRM mới (logo monochrome, design system) + user guide + quick start (quản trị/nhân viên).
+- Bộ nhận diện ZCRM mới (logo monochrome, design system) + user guide + quick start (quản trị/nhân viên).
 
 ### Fixed — Sửa lỗi
 - **clamav** image tag `1.3` → `1.4` (tag 1.3 không tồn tại trên Docker Hub).

@@ -10,7 +10,7 @@
         <img :src="logo" :alt="name" @error="onLogoError" />
       </div>
       <h1 class="brand-name">{{ name }}</h1>
-      <div class="brand-product">ZaloCRM</div>
+      <div class="brand-product">CRM</div>
       <div class="brand-divider"></div>
       <p v-if="slogan" class="brand-slogan">{{ slogan }}</p>
     </div>

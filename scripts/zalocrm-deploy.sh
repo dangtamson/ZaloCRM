@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# zalocrm-deploy.sh — Cài đặt / Nâng cấp ZaloCRM Community TỰ ĐỘNG.
+# zalocrm-deploy.sh — Cài đặt / Nâng cấp ZCRM Community TỰ ĐỘNG.
 #
 # Một lệnh lo trọn: tự phát hiện CÀI MỚI hay NÂNG CẤP, backup DB trước khi nâng cấp,
 # sinh .env (secret ngẫu nhiên) nếu chưa có, build + chạy Docker, migrate DB, rồi
@@ -43,7 +43,7 @@ gen() { openssl rand -hex "${1:-32}"; }
 # ── Pre-flight ────────────────────────────────────────────────────────────────
 need docker; need openssl
 docker compose version >/dev/null 2>&1 || die "Cần Docker Compose v2 (lệnh 'docker compose')."
-[ -f docker-compose.yml ] || die "Không thấy docker-compose.yml — chạy ở thư mục gốc mã nguồn ZaloCRM."
+[ -f docker-compose.yml ] || die "Không thấy docker-compose.yml — chạy ở thư mục gốc mã nguồn ZCRM."
 
 MODE="${1:-auto}"
 DBUSER="$(env_val DB_USER)"; DBUSER="${DBUSER:-crmuser}"
@@ -143,7 +143,7 @@ case "$MODE" in
 esac
 
 if [ "$MODE" = "install" ]; then
-  echo "═══ CÀI MỚI ZaloCRM Community ═══"
+  echo "═══ CÀI MỚI ZCRM Community ═══"
   ensure_env
   build_up
   wait_app
@@ -154,7 +154,7 @@ if [ "$MODE" = "install" ]; then
   ok "HOÀN TẤT cài mới."
   echo "→ Mở http://localhost:${PORT_DEFAULT} → trang /setup tự hiện → tạo tổ chức + tài khoản chủ."
 else
-  echo "═══ NÂNG CẤP ZaloCRM Community (giữ dữ liệu) ═══"
+  echo "═══ NÂNG CẤP ZCRM Community (giữ dữ liệu) ═══"
   [ -f .env ] || die "Không thấy .env — đây không phải bản đang chạy. Dùng 'install' để cài mới."
   backup_db
   build_up         # up -d --build, KHÔNG -v → GIỮ database

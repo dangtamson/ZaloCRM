@@ -6,9 +6,9 @@
     <!-- Gradient teal-navy + monogram HS + wordmark · 7 tab + Báo cáo + Cài đặt · MDI line icon · active HS -->
     <header class="smax-topnav">
       <!-- Brand — logo + tên lấy theo hồ sơ tổ chức (đồng bộ /login, /setup-password) -->
-      <RouterLink to="/" class="hs-brand" :title="`${brandName} ZaloCRM`">
+      <RouterLink to="/" class="hs-brand" :title="`${brandName} CRM`">
         <span class="hs-bbox"><img :src="brandLogo" :alt="brandName" @error="onLogoError" /></span>
-        <span class="hs-bwm"><span class="hs-b1">{{ brandName }}</span><span class="hs-b2">ZaloCRM</span></span>
+        <span class="hs-bwm"><span class="hs-b1">{{ brandName }}</span><span class="hs-b2">CRM</span></span>
       </RouterLink>
 
       <!-- Primary nav tabs -->

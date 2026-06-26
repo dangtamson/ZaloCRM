@@ -70,7 +70,7 @@ Session = chuỗi đăng nhập sẵn của tài khoản provisioner (để CRM 
 
 **Bước 1 — gửi OTP:**
 ```bash
-cd /root/0project/ZaloCRM
+cd /root/0project/ZCRM
 set -a; . ./.env; set +a   # nạp API_ID/API_HASH từ .env
 docker compose exec -T \
   -e API_ID="$TELEGRAM_PROVISIONER_API_ID" \
@@ -106,7 +106,7 @@ TELEGRAM_PROVISIONER_SESSION=<FINAL_SESSION>
 ## 5. Restart + kiểm tra
 
 ```bash
-cd /root/0project/ZaloCRM
+cd /root/0project/ZCRM
 docker compose up -d --force-recreate app
 docker compose logs app | grep -i telegram-bridge
 ```

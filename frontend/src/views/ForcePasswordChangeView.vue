@@ -14,7 +14,7 @@
         <span class="fpc-bbox"><img :src="brandLogo" :alt="brandName" @error="onLogoError" /></span>
         <span class="fpc-bwm">
           <span class="fpc-b1">{{ brandName }}</span>
-          <span class="fpc-b2">ZaloCRM</span>
+          <span class="fpc-b2">CRM</span>
         </span>
       </div>
 
